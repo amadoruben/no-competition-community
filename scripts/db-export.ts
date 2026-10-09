@@ -7,11 +7,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { openDatabase } from "../src/db";
 import { exportDatabase } from "../src/db/portable";
+import { migrationDatabaseUrl } from "../src/lib/supabase-env";
 
 async function main() {
   const args = process.argv.slice(2);
   const out = args.includes("--out") ? args[args.indexOf("--out") + 1] : path.join("backups", `ncc-export-${new Date().toISOString().replace(/[:.]/g, "-")}.json`);
-  const h = openDatabase(process.env.DATABASE_MIGRATION_URL || process.env.DATABASE_URL);
+  const h = openDatabase(migrationDatabaseUrl(process.env));
   const file = await exportDatabase(h.db, { includeAuth: !args.includes("--exclude-auth") });
   fs.mkdirSync(path.dirname(out), { recursive: true });
   fs.writeFileSync(out, JSON.stringify(file), { mode: 0o600 });

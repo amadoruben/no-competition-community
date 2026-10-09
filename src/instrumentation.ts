@@ -20,8 +20,10 @@ export async function register() {
   if (auto === "1") {
     const { dbHandle, openDatabase } = await import("./db");
     const { runMigrations } = await import("./db/migrate");
-    // Prefer a dedicated direct/session connection for DDL when provided.
-    const direct = process.env.DATABASE_MIGRATION_URL;
+    const { migrationDatabaseUrl } = await import("./lib/supabase-env");
+    // Prefer a session connection for DDL (explicit, or derived from a Supabase pooler URL).
+    const migUrl = migrationDatabaseUrl(process.env);
+    const direct = migUrl && migUrl !== process.env.DATABASE_URL ? migUrl : undefined;
     if (direct) {
       const h = openDatabase(direct);
       try {

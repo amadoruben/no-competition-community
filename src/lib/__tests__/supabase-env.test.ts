@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analyseSupabaseEnv, inspectDbUrl, inspectKey } from "../supabase-env";
+import { analyseSupabaseEnv, inspectDbUrl, inspectKey, migrationDatabaseUrl } from "../supabase-env";
 
 // Fictitious refs and keys: shaped like Supabase's, valid nowhere.
 const A = "aaaaaaaaaaaaaaaaaaaa";
@@ -49,5 +49,16 @@ describe("supabase env analysis", () => {
     expect(inspectDbUrl(`postgresql://postgres:x@db.${A}.supabase.co:5432/postgres`)).toMatchObject({ ref: A, kind: "direct" });
     expect(inspectDbUrl(good.DATABASE_URL)).toMatchObject({ ref: A, kind: "transaction-pooler" });
     expect(inspectKey("nonsense")?.kind).toBe("unknown");
+  });
+
+  it("derives the session-pooler URL for migrations from a transaction-pooler DATABASE_URL", () => {
+    const withoutMig = { ...good, DATABASE_MIGRATION_URL: undefined };
+    expect(migrationDatabaseUrl(withoutMig)).toBe(good.DATABASE_MIGRATION_URL);
+    expect(errors(withoutMig)).toEqual([]);
+    expect(JSON.stringify(analyseSupabaseEnv(withoutMig).findings)).toContain("derived from DATABASE_URL");
+    // An explicit value wins; non-Supabase URLs are used unchanged.
+    expect(migrationDatabaseUrl({ ...good, DATABASE_MIGRATION_URL: "postgres://x@db.example:5432/y" })).toBe("postgres://x@db.example:5432/y");
+    expect(migrationDatabaseUrl({ DATABASE_URL: "postgres://u@localhost:5432/ncc" })).toBe("postgres://u@localhost:5432/ncc");
+    expect(migrationDatabaseUrl({})).toBeUndefined();
   });
 });

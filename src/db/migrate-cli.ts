@@ -1,9 +1,13 @@
-/** CLI: apply pending migrations (npm run db:migrate). Uses DATABASE_MIGRATION_URL when set (direct connection). */
+/**
+ * CLI: apply pending migrations (npm run db:migrate). Uses DATABASE_MIGRATION_URL,
+ * or derives the Supabase session-pooler URL from DATABASE_URL (see migrationDatabaseUrl).
+ */
+import { migrationDatabaseUrl } from "../lib/supabase-env";
 import { openDatabase } from "./index";
 import { runMigrations } from "./migrate";
 
 async function main() {
-  const url = process.env.DATABASE_MIGRATION_URL || process.env.DATABASE_URL;
+  const url = migrationDatabaseUrl(process.env);
   if (!url) {
     // Lets a deployment without a database (e.g. a first Vercel preview) still
     // build; the app then reports 503 on /api/health until configured.

@@ -36,6 +36,22 @@ export function inspectDbUrl(raw: string | undefined): DbUrlInfo | null {
   return { ref, host: u.hostname, port, kind };
 }
 
+/**
+ * URL for migrations (needs a session: advisory locks). An explicit
+ * DATABASE_MIGRATION_URL wins; otherwise a Supabase shared-pooler URL in
+ * transaction mode (…pooler.supabase.com:6543) maps to the same host and user in
+ * session mode (port 5432), as documented by Supabase. Anything else is used as is.
+ */
+export function migrationDatabaseUrl(env: Env): string | undefined {
+  if (env.DATABASE_MIGRATION_URL) return env.DATABASE_MIGRATION_URL;
+  const raw = env.DATABASE_URL;
+  const info = inspectDbUrl(raw);
+  if (!raw || !info || info.kind !== "transaction-pooler" || !info.host.endsWith(".pooler.supabase.com")) return raw;
+  const u = new URL(raw);
+  u.port = "5432";
+  return u.toString();
+}
+
 type KeyInfo = { kind: "publishable" | "secret" | "anon-jwt" | "service-role-jwt" | "unknown"; ref: string | null };
 
 export function inspectKey(key: string | undefined): KeyInfo | null {
@@ -78,14 +94,17 @@ export function analyseSupabaseEnv(env: Env): { ref: string | null; findings: Fi
     if (/\[YOUR-PASSWORD\]|YOUR-PASSWORD/i.test(env.DATABASE_URL)) add("error", "DATABASE_URL still contains the [YOUR-PASSWORD] placeholder.");
   }
 
-  const mig = inspectDbUrl(env.DATABASE_MIGRATION_URL);
-  if (!env.DATABASE_MIGRATION_URL) add("warn", "DATABASE_MIGRATION_URL is empty; migrations will use DATABASE_URL (advisory locks need a session connection: Connect → Session pooler, port 5432).");
+  const derived = !env.DATABASE_MIGRATION_URL && migrationDatabaseUrl(env) !== env.DATABASE_URL;
+  const mig = inspectDbUrl(migrationDatabaseUrl(env));
+  if (!env.DATABASE_MIGRATION_URL && !derived)
+    add("warn", "DATABASE_MIGRATION_URL is empty; migrations will use DATABASE_URL (advisory locks need a session connection: Connect → Session pooler, port 5432).");
+  else if (derived && mig) add("ok", `DATABASE_MIGRATION_URL derived from DATABASE_URL: session pooler ${mig.host}:${mig.port}`);
   else if (!mig) add("error", "DATABASE_MIGRATION_URL is not a postgres:// URL.");
   else {
     if (mig.kind === "transaction-pooler") add("error", "DATABASE_MIGRATION_URL uses the transaction pooler; use the session pooler (port 5432) or the direct connection.");
     else add("ok", `DATABASE_MIGRATION_URL: ${mig.kind} ${mig.host}:${mig.port}`);
     if (ref && mig.ref && mig.ref !== ref) add("error", `DATABASE_MIGRATION_URL belongs to project ${mig.ref}, but NEXT_PUBLIC_SUPABASE_URL is project ${ref}.`);
-    if (/YOUR-PASSWORD/i.test(env.DATABASE_MIGRATION_URL)) add("error", "DATABASE_MIGRATION_URL still contains the [YOUR-PASSWORD] placeholder.");
+    if (/YOUR-PASSWORD/i.test(env.DATABASE_MIGRATION_URL ?? "")) add("error", "DATABASE_MIGRATION_URL still contains the [YOUR-PASSWORD] placeholder.");
   }
 
   const pub = inspectKey(env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);

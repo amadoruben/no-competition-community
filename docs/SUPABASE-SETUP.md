@@ -8,14 +8,14 @@ Use **um projecto Supabase dedicado** à NCC. Nunca reutilize um projecto de out
 
 A aplicação protege-se disto: `db:migrate`, `db:seed`, `db:import`, `user:role` e o build da Vercel **recusam** correr numa base que tenha tabelas ou migrações de outra aplicação (`src/db/guard.ts`), e `supabase:check` recusa URLs e chaves de projectos diferentes misturados.
 
-## 1. Os cinco valores e onde estão
+## 1. Os valores e onde estão
 
 Dashboard do Supabase → projecto da NCC:
 
 | # | Variável | Onde | Secreto? |
 |---|---|---|---|
 | 1 | `DATABASE_URL` | botão **Connect** (topo) → **Transaction pooler** (porta **6543**) | **sim** |
-| 2 | `DATABASE_MIGRATION_URL` | **Connect** → **Session pooler** (porta **5432**) | **sim** |
+| 2 | `DATABASE_MIGRATION_URL` *(opcional)* | **Connect** → **Session pooler** (porta **5432**). Se ficar vazio, é derivado do valor 1 (mesmo host e utilizador, porta 5432) | **sim** |
 | 3 | `NEXT_PUBLIC_SUPABASE_URL` | **Project Settings → API Keys** → Project URL (`https://<ref>.supabase.co`) | não |
 | 4 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | **Project Settings → API Keys** → Publishable key (`sb_publishable_…`) | não |
 | 5 | `SUPABASE_SERVICE_ROLE_KEY` | **Project Settings → API Keys** → Secret keys (`sb_secret_…`) | **sim** |
@@ -77,12 +77,11 @@ Dados de demonstração **não** devem ir para um projecto que venha a ser de pr
 
 Vercel → projecto **no-competition-community** → **Settings → Environment Variables** → *Add*. Comece **só com o ambiente Preview** (a branch `main`/Production fica intocada até decidir).
 
-Já configurado (Preview, branch `claude/no-competition-mvp`): `NEXT_PUBLIC_SUPABASE_URL`, `APP_ENV=preview`, `AUTH_PROVIDER=supabase`, `STORAGE_PROVIDER=supabase`, `DEMO_MODE=0`. Faltam os quatro valores 1, 2, 4 e 5 — em *Environments* escolha **Preview** e, em *Branch*, `claude/no-competition-mvp`:
+Já configurado (Preview, branch `claude/no-competition-mvp`): `NEXT_PUBLIC_SUPABASE_URL`, `APP_ENV=preview`, `AUTH_PROVIDER=supabase`, `STORAGE_PROVIDER=supabase`, `DEMO_MODE=0`. Faltam os **três** valores 1, 4 e 5 (o 2 é derivado automaticamente) — em *Environments* escolha **Preview** e, em *Branch*, `claude/no-competition-mvp`:
 
 | Nome | Valor | Ambiente | *Sensitive* |
 |---|---|---|---|
 | `DATABASE_URL` | valor 1 | Preview | ✓ |
-| `DATABASE_MIGRATION_URL` | valor 2 | Preview | ✓ |
 | `NEXT_PUBLIC_SUPABASE_URL` | valor 3 | Preview | — |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | valor 4 | Preview | — |
 | `SUPABASE_SERVICE_ROLE_KEY` | valor 5 | Preview | ✓ |

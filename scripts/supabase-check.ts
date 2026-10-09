@@ -23,7 +23,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { openDatabase } from "../src/db";
 import { assertOwnDatabase } from "../src/db/guard";
 import { MIGRATIONS_DIR } from "../src/db/migrate";
-import { analyseSupabaseEnv, type Finding } from "../src/lib/supabase-env";
+import { analyseSupabaseEnv, migrationDatabaseUrl, type Finding } from "../src/lib/supabase-env";
 
 const results: Finding[] = [];
 const mark = { ok: "✓", warn: "!", error: "✗" } as const;
@@ -53,7 +53,8 @@ async function checkDatabase(label: string, url: string | undefined) {
   }
 }
 
-const REQUIRED = ["DATABASE_URL", "DATABASE_MIGRATION_URL", "NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "SUPABASE_SERVICE_ROLE_KEY"];
+// DATABASE_MIGRATION_URL is optional: derived from a Supabase pooler DATABASE_URL.
+const REQUIRED = ["DATABASE_URL", "NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "SUPABASE_SERVICE_ROLE_KEY"];
 
 async function main() {
   const env = process.env;
@@ -76,7 +77,8 @@ async function main() {
 
   console.log("\n2. Database");
   const run = await checkDatabase("DATABASE_URL", env.DATABASE_URL);
-  const mig = env.DATABASE_MIGRATION_URL ? await checkDatabase("DATABASE_MIGRATION_URL", env.DATABASE_MIGRATION_URL) : run;
+  const migUrl = migrationDatabaseUrl(env);
+  const mig = migUrl && migUrl !== env.DATABASE_URL ? await checkDatabase("Migration connection (session)", migUrl) : run;
   const h = mig ?? run;
   if (h) {
     try {
