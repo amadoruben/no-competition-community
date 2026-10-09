@@ -113,4 +113,36 @@ describe("supabase env analysis", () => {
       expect(text).toContain("Transaction pooler");
     });
   });
+
+  describe("variables written by the Supabase–Vercel integration", () => {
+    const integration = {
+      AUTH_PROVIDER: "supabase",
+      STORAGE_PROVIDER: "supabase",
+      SUPABASE_URL: `https://${A}.supabase.co`,
+      POSTGRES_URL: `postgres://postgres.${A}:pw-int@aws-0-eu-west-2.pooler.supabase.com:6543/postgres?sslmode=require&supa=base-pooler.x`,
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_int",
+      SUPABASE_SECRET_KEY: "sb_secret_int",
+    };
+
+    it("work on their own, with the integration's extra URL parameters dropped", () => {
+      const url = new URL(databaseUrlFrom(integration)!);
+      expect([...url.searchParams.keys()]).toEqual(["sslmode"]);
+      expect(new URL(migrationDatabaseUrl(integration)!).port).toBe("5432");
+      expect(supabaseUrl(integration)).toBe(`https://${A}.supabase.co`);
+      expect(errors(integration)).toEqual([]);
+      expect(JSON.stringify(analyseSupabaseEnv(integration).findings)).toContain("POSTGRES_URL");
+    });
+
+    it("POSTGRES_URL fills in for a DATABASE_URL still waiting for its password", () => {
+      const env = { ...integration, DATABASE_URL: `postgresql://postgres.${A}:[YOUR-PASSWORD]@aws-0-eu-west-2.pooler.supabase.com:6543/postgres` };
+      expect(new URL(databaseUrlFrom(env)!).password).toBe("pw-int");
+      // A complete DATABASE_URL still wins.
+      expect(new URL(databaseUrlFrom({ ...env, SUPABASE_DB_PASSWORD: "own" })!).password).toBe("own");
+    });
+
+    it("a POSTGRES_URL from another project is caught", () => {
+      expect(errors({ ...integration, POSTGRES_URL: integration.POSTGRES_URL.replaceAll(A, B) }).join()).toContain(`belongs to project ${B}`);
+    });
+  });
 });
+

@@ -45,8 +45,11 @@ export function clean(v: string | undefined): string | undefined {
 }
 
 /** Project URL reduced to its origin: "https://<ref>.supabase.co/rest/v1/" → "https://<ref>.supabase.co". */
+// Names written by the Supabase–Vercel integration are accepted as fallbacks, so its
+// variables can be used as they are, without copying values into our own names.
+
 export function supabaseUrl(env: Env): string | undefined {
-  const raw = clean(env.NEXT_PUBLIC_SUPABASE_URL);
+  const raw = clean(env.NEXT_PUBLIC_SUPABASE_URL) ?? clean(env.SUPABASE_URL);
   if (!raw) return undefined;
   try {
     const u = new URL(raw);
@@ -56,7 +59,8 @@ export function supabaseUrl(env: Env): string | undefined {
   }
 }
 
-export const publishableKey = (env: Env) => clean(env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
+export const publishableKey = (env: Env) =>
+  clean(env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) ?? clean(env.SUPABASE_PUBLISHABLE_KEY) ?? clean(env.NEXT_PUBLIC_SUPABASE_ANON_KEY) ?? clean(env.SUPABASE_ANON_KEY);
 /** The dashboard calls it "Secret key"; SUPABASE_SERVICE_ROLE_KEY is the older name, still accepted. */
 export const secretKey = (env: Env) => clean(env.SUPABASE_SECRET_KEY) ?? clean(env.SUPABASE_SERVICE_ROLE_KEY);
 export const SECRET_KEY_VAR = "SUPABASE_SECRET_KEY";
@@ -101,8 +105,20 @@ const isSharedPooler = (url: string | undefined) => !!url && inspectDbUrl(url)?.
  * (port 5432) is switched to transaction mode (6543, same host and user), which
  * serverless functions need.
  */
+/**
+ * Where the database connection comes from: DATABASE_URL when it is usable, otherwise
+ * the integration's POSTGRES_URL (a complete transaction-pooler string).
+ */
+export function databaseUrlSource(env: Env): { name: "DATABASE_URL" | "POSTGRES_URL"; raw: string } | undefined {
+  const own = clean(env.DATABASE_URL);
+  const integration = clean(env.POSTGRES_URL);
+  if (own && !(hasPasswordPlaceholder(own) && !clean(env.SUPABASE_DB_PASSWORD))) return { name: "DATABASE_URL", raw: own };
+  if (integration) return { name: "POSTGRES_URL", raw: integration };
+  return own ? { name: "DATABASE_URL", raw: own } : undefined;
+}
+
 export function databaseUrlFrom(env: Env): string | undefined {
-  const url = normaliseDbUrl(env.DATABASE_URL, clean(env.SUPABASE_DB_PASSWORD));
+  const url = normaliseDbUrl(databaseUrlSource(env)?.raw, clean(env.SUPABASE_DB_PASSWORD));
   return url && isSharedPooler(url) && inspectDbUrl(url)?.port === 5432 ? withPort(url, "6543") : url;
 }
 
@@ -162,13 +178,15 @@ export function analyseSupabaseEnv(env: Env): { ref: string | null; findings: Fi
     if (env[name] !== "supabase") add("warn", `${name} is "${env[name] ?? "local"}"; set it to "supabase" to use the Supabase project.`);
   }
 
-  const pasted = clean(env.DATABASE_URL);
+  const source = databaseUrlSource(env);
+  const pasted = source?.raw;
   const runtimeUrl = databaseUrlFrom(env);
   const run = inspectDbUrl(runtimeUrl);
-  if (!pasted) add("error", "DATABASE_URL is empty (Supabase → Connect → copy the connection string as shown).");
+  if (!pasted) add("error", "DATABASE_URL is empty (Supabase → Connect → copy the connection string as shown), and there is no POSTGRES_URL from the Supabase–Vercel integration.");
   else if (hasPasswordPlaceholder(runtimeUrl)) add("error", "DATABASE_URL contains [YOUR-PASSWORD]: add SUPABASE_DB_PASSWORD with the database password (it is inserted automatically).");
   else if (!run) add("error", "DATABASE_URL is not a postgres:// connection string.");
   else {
+    if (source?.name === "POSTGRES_URL") add("ok", "Database connection taken from POSTGRES_URL (Supabase–Vercel integration)");
     if (hasPasswordPlaceholder(pasted)) add("ok", "Database password taken from SUPABASE_DB_PASSWORD");
     if (inspectDbUrl(normaliseDbUrl(pasted, undefined))?.kind === "session-pooler") add("ok", "Session-pooler string switched to transaction mode (port 6543) for the app");
     if (run.kind === "direct")

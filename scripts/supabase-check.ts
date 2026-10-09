@@ -25,8 +25,8 @@ import { assertOwnDatabase } from "../src/db/guard";
 import { MIGRATIONS_DIR } from "../src/db/migrate";
 import {
   analyseSupabaseEnv,
-  clean,
   databaseUrlFrom,
+  databaseUrlSource,
   hasPasswordPlaceholder,
   migrationDatabaseUrl,
   publishableKey,
@@ -67,7 +67,7 @@ async function checkDatabase(label: string, url: string | undefined) {
 /** Names of the values still to provide (DATABASE_MIGRATION_URL is derived, never required). */
 function missingValues(env: NodeJS.ProcessEnv) {
   const missing: string[] = [];
-  if (!clean(env.DATABASE_URL)) missing.push("DATABASE_URL");
+  if (!databaseUrlSource(env)) missing.push("DATABASE_URL");
   else if (hasPasswordPlaceholder(databaseUrlFrom(env))) missing.push("SUPABASE_DB_PASSWORD");
   if (!supabaseUrl(env)) missing.push("NEXT_PUBLIC_SUPABASE_URL");
   if (!publishableKey(env)) missing.push("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY");
