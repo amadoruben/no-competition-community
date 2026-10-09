@@ -16,7 +16,7 @@
  * Supabase values are set (lists the missing names), then runs every check and fails
  * the build on errors; adds the sign-in round trip unless APP_ENV=production.
  */
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { sql } from "drizzle-orm";
 import { readMigrationFiles } from "drizzle-orm/migrator";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -73,6 +73,67 @@ function missingValues(env: NodeJS.ProcessEnv) {
   if (!publishableKey(env)) missing.push("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY");
   if (!secretKey(env)) missing.push(SECRET_KEY_VAR);
   return missing;
+}
+
+/** Where Supabase sends a browser for a given link (never follows it). */
+async function redirectTarget(link: string): Promise<string | null> {
+  const res = await fetch(link, { redirect: "manual", signal: AbortSignal.timeout(10_000) });
+  return res.headers.get("location");
+}
+const originOf = (u: string | null) => {
+  try {
+    return u ? new URL(u).origin : null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Email links against the real project, without sending email:
+ *  - Site URL: an invalid link is sent back to the Site URL (fallback for every link);
+ *  - redirect allow-list: whether this deployment's addresses are accepted as redirect targets;
+ *  - a real sign-up confirmation link for a throwaway user, followed one hop: it must confirm
+ *    the account and land on this deployment's /auth/callback with a session.
+ * Prints origins and yes/no only — never tokens.
+ */
+async function checkEmailLinks(url: string, admin: SupabaseClient) {
+  const targets = [...new Set([process.env.APP_URL, process.env.VERCEL_BRANCH_URL, process.env.VERCEL_URL].filter(Boolean).map((h) => (h!.startsWith("http") ? h! : `https://${h}`)).map((o) => new URL(o).origin))];
+  console.log("\n6. Email links");
+  const probe = (redirect?: string) => `${url}/auth/v1/verify?type=signup&token=ncc-link-probe${redirect ? `&redirect_to=${encodeURIComponent(redirect)}` : ""}`;
+  try {
+    const site = originOf(await redirectTarget(probe()));
+    report(site ? "ok" : "warn", site ? `Site URL (fallback for email links): ${site}` : "Could not determine the Site URL");
+    if (!targets.length) return report("warn", "No deployment address known (APP_URL / VERCEL_BRANCH_URL): redirect checks skipped");
+    let primaryAllowed = false;
+    for (const [i, origin] of targets.entries()) {
+      const landed = originOf(await redirectTarget(probe(`${origin}/auth/callback`)));
+      const allowed = landed === origin;
+      if (i === 0) primaryAllowed = allowed;
+      report(allowed ? "ok" : i === 0 ? "error" : "warn", allowed
+        ? `Redirect allowed: ${origin}`
+        : `Redirect NOT allowed: ${origin} (Supabase would send users to ${landed ?? "?"}). Add ${origin}/** to Authentication → URL Configuration → Redirect URLs`);
+    }
+    if (!primaryAllowed) return;
+
+    const email = `ncc-link-${randomUUID().slice(0, 8)}@example.com`;
+    const redirectTo = `${targets[0]}/auth/callback`;
+    const { data, error } = await admin.auth.admin.generateLink({ type: "signup", email, password: randomBytes(18).toString("base64url"), options: { redirectTo } });
+    if (error || !data.properties?.action_link) return report("error", `Could not generate a sign-up link — ${reason(error)}`);
+    try {
+      const landing = await redirectTarget(data.properties.action_link);
+      const ok = !!landing && landing.startsWith(redirectTo) && /access_token=|[?&]code=/.test(landing);
+      report(ok ? "ok" : "error", ok
+        ? `Sign-up confirmation link confirms the account and returns to ${redirectTo} with a session`
+        : `Sign-up confirmation link landed on ${originOf(landing) ?? "?"} without a session`);
+      const { data: after } = await admin.auth.admin.getUserById(data.user.id);
+      report(after.user?.email_confirmed_at ? "ok" : "error", after.user?.email_confirmed_at ? "Account marked as confirmed" : "Account NOT confirmed after following the link");
+    } finally {
+      const { error: delErr } = await admin.auth.admin.deleteUser(data.user.id);
+      report(delErr ? "warn" : "ok", delErr ? `Delete the throwaway user ${email} manually` : "Throwaway user deleted");
+    }
+  } catch (e) {
+    report("warn", `Email link checks could not run — ${reason(e)}`);
+  }
 }
 
 async function main() {
@@ -171,6 +232,7 @@ async function main() {
           report(delErr ? "warn" : "ok", delErr ? `Delete the throwaway user ${email} manually` : "Throwaway user deleted");
         }
       }
+      await checkEmailLinks(url, admin);
     }
   }
 
