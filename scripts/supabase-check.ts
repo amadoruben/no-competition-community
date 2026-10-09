@@ -11,6 +11,10 @@
  *      with the publishable key (the same call the login page makes), then deletes it
  *
  * Read-only except step 5 (opt-in, cleans up after itself). Exit code 1 on any error.
+ *
+ * --build (Vercel build step): does nothing until AUTH_PROVIDER=supabase and all five
+ * Supabase values are set (lists the missing names), then runs every check and fails
+ * the build on errors; adds the sign-in round trip unless APP_ENV=production.
  */
 import { createClient } from "@supabase/supabase-js";
 import { sql } from "drizzle-orm";
@@ -49,8 +53,19 @@ async function checkDatabase(label: string, url: string | undefined) {
   }
 }
 
+const REQUIRED = ["DATABASE_URL", "DATABASE_MIGRATION_URL", "NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "SUPABASE_SERVICE_ROLE_KEY"];
+
 async function main() {
   const env = process.env;
+  const build = process.argv.includes("--build");
+  const roundtrip = process.argv.includes("--auth-roundtrip") || (build && env.APP_ENV !== "production");
+  if (build) {
+    const missing = REQUIRED.filter((k) => !env[k]);
+    if (env.AUTH_PROVIDER !== "supabase" || missing.length) {
+      console.warn(`⚠ Supabase check skipped: ${env.AUTH_PROVIDER !== "supabase" ? "AUTH_PROVIDER is not supabase" : `missing ${missing.join(", ")}`}.`);
+      return;
+    }
+  }
   console.log("\n1. Configuration");
   const { ref, findings } = analyseSupabaseEnv(env);
   for (const f of findings) report(f.level, f.message);
@@ -113,7 +128,7 @@ async function main() {
     else if (error && /not found/i.test(error.message)) report("warn", `Bucket "${bucket}" does not exist yet — npm run supabase:bootstrap (the Vercel build also creates it)`);
     else report("error", `Storage check failed — ${reason(error)} (is the secret key from project ${ref}?)`);
 
-    if (process.argv.includes("--auth-roundtrip")) {
+    if (roundtrip) {
       console.log("\n5. Sign-in round trip");
       const email = `ncc-check-${randomUUID().slice(0, 8)}@example.com`;
       const password = randomBytes(18).toString("base64url");

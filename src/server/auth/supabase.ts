@@ -2,7 +2,8 @@ import "server-only";
 import { createServerClient } from "@supabase/ssr";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
-import { AuthError, type AuthIdentity, type AuthProvider } from "./types";
+import { TOKEN_HASH_PREFIX } from "@/lib/auth-links";
+import { AuthError, type AuthIdentity, type AuthProvider, type EmailLink } from "./types";
 
 /**
  * Supabase Auth adapter. The only module that imports the Supabase auth SDK.
@@ -63,9 +64,12 @@ export class SupabaseAuthProvider implements AuthProvider {
     return { identity: { subject: data.user.id, email: data.user.email! }, needsEmailConfirmation: !data.session };
   }
 
-  async exchangeCallback(code: string): Promise<AuthIdentity> {
-    const { data, error } = await (await this.client()).auth.exchangeCodeForSession(code);
-    if (error || !data.user) throw new AuthError("O link expirou ou já foi utilizado.");
+  async exchangeCallback(link: EmailLink): Promise<AuthIdentity> {
+    const sb = await this.client();
+    const { data, error } = link.tokenHash
+      ? await sb.auth.verifyOtp({ token_hash: link.tokenHash, type: (link.type ?? "email") as "email" | "signup" | "invite" | "magiclink" | "email_change" })
+      : await sb.auth.exchangeCodeForSession(link.code ?? "");
+    if (error || !data.user) throw new AuthError(LINK_FAILED);
     return { subject: data.user.id, email: data.user.email! };
   }
 
@@ -83,11 +87,16 @@ export class SupabaseAuthProvider implements AuthProvider {
     await (await this.client()).auth.resetPasswordForEmail(email, { redirectTo });
   }
 
-  /** `token` is the PKCE code from the email link (…/reset-password?code=…). */
+  /**
+   * `token` is the PKCE code from the email link (…/reset-password?code=…), or
+   * `th:<token_hash>` when the email template links with {{ .TokenHash }} (any device).
+   */
   async completePasswordReset({ token, password }: { token: string; password: string }): Promise<AuthIdentity> {
     const sb = await this.client();
-    const { error: exchangeError } = await sb.auth.exchangeCodeForSession(token);
-    if (exchangeError) throw new AuthError("O link expirou ou já foi utilizado. Peça um novo.");
+    const { error: exchangeError } = token.startsWith(TOKEN_HASH_PREFIX)
+      ? await sb.auth.verifyOtp({ token_hash: token.slice(TOKEN_HASH_PREFIX.length), type: "recovery" })
+      : await sb.auth.exchangeCodeForSession(token);
+    if (exchangeError) throw new AuthError(`${LINK_FAILED} Peça um novo.`);
     const { data, error } = await sb.auth.updateUser({ password });
     if (error || !data.user) throw new AuthError("Não foi possível actualizar a palavra-passe.");
     return { subject: data.user.id, email: data.user.email! };
@@ -102,6 +111,9 @@ export class SupabaseAuthProvider implements AuthProvider {
     return { subject: data.user.id, email: data.user.email! };
   }
 }
+
+// PKCE links only work in the browser that asked for them; say so instead of a bare "expired".
+const LINK_FAILED = "O link expirou, já foi utilizado ou foi aberto noutro browser — abra-o no mesmo browser onde fez o pedido.";
 
 function required(name: string) {
   const v = process.env[name];

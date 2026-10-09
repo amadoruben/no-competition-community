@@ -17,7 +17,7 @@
     "db:export": "tsx --env-file-if-exists=.env.local scripts/db-export.ts",
     "db:import": "tsx --env-file-if-exists=.env.local scripts/db-import.ts",
     "db:verify": "tsx --env-file-if-exists=.env.local scripts/db-verify.ts",
-    "vercel-build": "tsx src/db/migrate-cli.ts --skip-if-unconfigured && tsx scripts/supabase-bootstrap.ts --skip-if-unconfigured && next build",
+    "vercel-build": "tsx scripts/supabase-check.ts --build && tsx src/db/migrate-cli.ts --skip-if-unconfigured && tsx scripts/supabase-bootstrap.ts --skip-if-unconfigured && next build",
     "supabase:bootstrap": "tsx --env-file-if-exists=.env.local scripts/supabase-bootstrap.ts",
     "supabase:check": "tsx --env-file-if-exists=.env.local scripts/supabase-check.ts",
     "user:role": "tsx --env-file-if-exists=.env.local scripts/user-role.ts"

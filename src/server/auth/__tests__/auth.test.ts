@@ -72,6 +72,10 @@ describe("SupabaseAuthProvider (contract against the Supabase Auth HTTP API)", (
       if (body.password === "rate-limited") return json(429, { code: "over_request_rate_limit", msg: "rate limit" });
       return body.password === "good-password" ? json(200, session) : json(400, { code: "invalid_credentials", msg: "Invalid login credentials" });
     }
+    if (url.pathname === "/auth/v1/verify" && init?.method === "POST") {
+      const body = JSON.parse(String(init.body));
+      return body.token_hash === "good-hash" ? json(200, session) : json(403, { code: "otp_expired", msg: "Token has expired or is invalid" });
+    }
     if (url.pathname === "/auth/v1/user") return json(200, user);
     if (url.pathname === "/auth/v1/recover") return json(200, {});
     return json(404, { msg: "not mocked" });
@@ -94,5 +98,20 @@ describe("SupabaseAuthProvider (contract against the Supabase Auth HTTP API)", (
   it("requests a password reset through the provider", async () => {
     await sb.requestPasswordReset("ana@example.test", "https://app.test/reset-password");
     expect(calls.some((c) => c.startsWith("POST /auth/v1/recover"))).toBe(true);
+  });
+
+  it("confirms an email link by token_hash (works on any device)", async () => {
+    expect(await sb.exchangeCallback({ tokenHash: "good-hash", type: "email" })).toEqual({ subject: user.id, email: user.email });
+    expect(calls).toContain("POST /auth/v1/verify");
+    expect([...jar.keys()].some((k) => k.startsWith("sb-"))).toBe(true); // signed in after confirming
+    expect(await errKind(sb.exchangeCallback({ tokenHash: "stale-hash", type: "email" }))).toBe("invalid");
+  });
+
+  it("completes a password reset from a token_hash link", async () => {
+    calls.length = 0;
+    await sb.completePasswordReset({ token: "th:good-hash", password: "new-password-1" });
+    expect(calls[0]).toBe("POST /auth/v1/verify");
+    expect(calls).toContain("PUT /auth/v1/user");
+    expect(await errKind(sb.completePasswordReset({ token: "th:stale-hash", password: "new-password-1" }))).toBe("invalid");
   });
 });

@@ -14,14 +14,20 @@ export interface AuthIdentity {
 
 export type SignUpResult = { identity: AuthIdentity; needsEmailConfirmation: boolean };
 
+export type EmailLink = { code?: string; tokenHash?: string; type?: string };
+
 export interface AuthProvider {
   readonly name: string;
   /** Verify credentials and start a session for the current request. */
   signIn(email: string, password: string): Promise<AuthIdentity>;
   /** Create an identity and, when possible, start a session. `confirmRedirect` is where email confirmation links land. */
   signUp(email: string, password: string, opts?: { confirmRedirect?: string }): Promise<SignUpResult>;
-  /** Finish an email link (sign-up confirmation) carrying a one-time code. Optional: local auth has no confirmation step. */
-  exchangeCallback?(code: string): Promise<AuthIdentity>;
+  /**
+   * Finish an email link (sign-up confirmation). Either a PKCE `code` (works in the
+   * browser that started the flow) or a `tokenHash` + `type` (works on any device).
+   * Optional: local auth has no confirmation step.
+   */
+  exchangeCallback?(link: EmailLink): Promise<AuthIdentity>;
   /** Identity of the current request, validated by the provider. */
   currentIdentity(): Promise<AuthIdentity | null>;
   signOut(): Promise<void>;

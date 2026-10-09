@@ -33,6 +33,12 @@ Porquê dois URLs: a aplicação em serverless usa o *transaction pooler*; as mi
   - `https://no-competition-community-git-claude-no-compet-150e52-amadoruben.vercel.app/**` (preview desta branch)
   - mais tarde: `https://<domínio de produção>/auth/callback` e `/reset-password`
 
+**Links de email em qualquer dispositivo (opcional, recomendado):** com os modelos por omissão, o link de confirmação e o de recuperação só funcionam no browser onde o pedido foi feito (PKCE). Para funcionarem noutro dispositivo, em **Authentication → Emails → Templates** troque o link por:
+- *Confirm signup*: `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email`
+- *Reset password*: `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=recovery`
+
+A aplicação aceita os dois formatos (`/auth/callback` e `/reset-password`).
+
 **Authentication → Sign In / Providers → Email**: activo. *Confirm email* pode ficar ligado: o SMTP por omissão do Supabase só entrega a membros da equipa da organização — o seu próprio email serve para validar; para outros utilizadores é preciso SMTP próprio (`docs/OPERATIONS.md` §8).
 
 ## 3A. Testar na sua máquina (recomendado para a primeira validação)
@@ -69,7 +75,9 @@ Dados de demonstração **não** devem ir para um projecto que venha a ser de pr
 
 ## 3B. Testar na Vercel (permite-me verificar o deploy daqui)
 
-Vercel → projecto **no-competition-community** → **Settings → Environment Variables** → *Add*. Comece **só com o ambiente Preview** (a branch `main`/Production fica intocada até decidir):
+Vercel → projecto **no-competition-community** → **Settings → Environment Variables** → *Add*. Comece **só com o ambiente Preview** (a branch `main`/Production fica intocada até decidir).
+
+Já configurado (Preview, branch `claude/no-competition-mvp`): `NEXT_PUBLIC_SUPABASE_URL`, `APP_ENV=preview`, `AUTH_PROVIDER=supabase`, `STORAGE_PROVIDER=supabase`, `DEMO_MODE=0`. Faltam os quatro valores 1, 2, 4 e 5 — em *Environments* escolha **Preview** e, em *Branch*, `claude/no-competition-mvp`:
 
 | Nome | Valor | Ambiente | *Sensitive* |
 |---|---|---|---|
@@ -85,7 +93,7 @@ Vercel → projecto **no-competition-community** → **Settings → Environment 
 
 `APP_URL` fica vazio em Preview (cada preview tem o seu endereço; a app usa o do pedido). Em Production será o domínio final.
 
-Depois: **Deployments** → último deploy da branch `claude/no-competition-mvp` → **⋯ → Redeploy** (ou diga-me e eu faço um push). O build aplica as migrações e cria o bucket; se a base pertencer a outro produto, o build **falha** sem lhe tocar. Eu verifico daqui: logs do build, `/api/health` (deve dar `200` com `database.ok=true`) e o login.
+Depois: **Deployments** → último deploy da branch `claude/no-competition-mvp` → **⋯ → Redeploy** (ou diga-me e eu faço um push). O build, por esta ordem: corre `supabase:check` (mesmo projecto em todos os valores, chaves do tipo certo, ligação, base vazia ou da NCC, Auth e — fora de produção — um login real com um utilizador temporário que é apagado a seguir); aplica as migrações; cria o bucket privado. Qualquer erro **falha o build** antes de escrever; se a base pertencer a outro produto, nada é alterado. Eu verifico daqui: logs do build, `/api/health` (deve dar `200` com `database.ok=true`) e o login.
 
 ## 4. Depois de validado
 
