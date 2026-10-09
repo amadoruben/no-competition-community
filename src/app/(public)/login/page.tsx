@@ -25,7 +25,7 @@ export default async function LoginPage(props: PageProps<"/login">) {
   return (
     <AuthShell
       title="Bem-vindo de volta"
-      subtitle="Entre na sua conta ou explore com uma conta de demonstração."
+      subtitle={demo ? "Entre na sua conta ou explore com uma conta de demonstração." : "Entre na sua conta."}
       aside={
         demo ? (
         <>
