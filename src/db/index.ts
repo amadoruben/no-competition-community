@@ -29,7 +29,8 @@ export function databaseUrl() {
   return url;
 }
 
-export function openDatabase(url = databaseUrl()): DbHandle {
+export function openDatabase(url: string | undefined = undefined): DbHandle {
+  url ??= databaseUrl();
   if (url.startsWith("pglite://")) {
     // Loaded lazily so production bundles never initialise the WASM runtime.
     // eslint-disable-next-line @typescript-eslint/no-require-imports

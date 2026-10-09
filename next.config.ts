@@ -13,6 +13,8 @@ const nextConfig: NextConfig = {
   // Node host or container; Vercel ignores this and uses its own packaging.
   output: "standalone",
   poweredByHeader: false,
+  // Migrations ship with the server so DB_AUTO_MIGRATE works in standalone deployments.
+  outputFileTracingIncludes: { "/**": ["./drizzle/**/*"] },
   // Native/WASM database drivers stay out of the bundle.
   serverExternalPackages: ["@electric-sql/pglite", "postgres"],
   experimental: {

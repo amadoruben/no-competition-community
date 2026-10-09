@@ -20,6 +20,7 @@ test("full challenge lifecycle: create → publish → submit → evaluate → p
   await inv.getByRole("button", { name: "Criar rascunho" }).click();
   await expect(inv.getByText("Rascunho criado")).toBeVisible();
   await inv.getByRole("button", { name: "Publicar" }).click();
+  await inv.getByRole("dialog").getByRole("button", { name: "Publicar" }).click();
   await expect(inv.getByText("Desafio publicado.")).toBeVisible();
   const adminUrl = inv.url().split("?")[0];
 
@@ -45,6 +46,7 @@ test("full challenge lifecycle: create → publish → submit → evaluate → p
   // Investor closes, evaluates, confirms and publishes.
   await inv.goto(adminUrl);
   await inv.getByRole("button", { name: "Encerrar submissões" }).click();
+  await inv.getByRole("dialog").getByRole("button", { name: "Encerrar submissões" }).click();
   await expect(inv.getByText("Submissões encerradas.").first()).toBeVisible();
   await inv.goto(`${adminUrl}?tab=submissions`);
   await inv.getByRole("link", { name: "Avaliar" }).first().click();
@@ -62,6 +64,7 @@ test("full challenge lifecycle: create → publish → submit → evaluate → p
   await expect(mem.getByRole("link", { name: "Resultados" })).toHaveCount(0);
 
   await inv.getByRole("button", { name: "Publicar resultados" }).click();
+  await inv.getByRole("dialog").getByRole("button", { name: "Publicar resultados" }).click();
   await expect(inv.getByText("Resultados publicados e anunciados à comunidade.")).toBeVisible();
   await expect(inv.getByText(/Resultados publicados a /)).toBeVisible();
 

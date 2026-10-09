@@ -98,7 +98,9 @@ export const files = pgTable("files", {
   storageKey: text("storage_key").notNull().unique(),
   contentType: text("content_type").notNull(),
   size: integer("size").notNull(),
-  ownerId: uuid("owner_id").references(() => users.id, { onDelete: "set null" }),
+  /** Uploader, for auditing. Deliberately not a foreign key: users → files already
+   *  references this table, and a cycle would prevent ordered restores. */
+  ownerId: uuid("owner_id"),
   createdAt: createdAt(),
 });
 

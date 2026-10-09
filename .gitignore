@@ -46,3 +46,4 @@ next-env.d.ts
 !/data/.gitkeep
 /test-results/
 /playwright-report/
+/backups/
