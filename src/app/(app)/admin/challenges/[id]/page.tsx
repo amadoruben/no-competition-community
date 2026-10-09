@@ -1,16 +1,17 @@
-import { ArrowLeft, ClipboardCheck, Eye, Pencil, Scale } from "lucide-react";
+import { ClipboardCheck, Eye, Pencil, Scale } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PhaseBadge, RankMedal, RoleTag, ScorePill } from "@/components/domain";
-import { Avatar, Badge, ButtonLink, Card, CardHeader, cx, EmptyState, Notice, ProjectLogo, Tabs } from "@/components/ui";
+import { Avatar, Badge, Breadcrumbs, ButtonLink, Card, CardHeader, cx, EmptyState, Notice, ProjectLogo, Tabs } from "@/components/ui";
 import { challengePhase, STATUS_LABEL } from "@/lib/challenge-state";
 import { fmtDate, fmtDateTime, fmtScore } from "@/lib/format";
 import { STAGE_LABEL, SUBMISSION_STATUS_LABEL, SUBMISSION_STATUS_TONE } from "@/lib/labels";
-import { getChallengeBySlug } from "@/server/challenges";
+import { getChallengeBySlug, type ChallengeDetail } from "@/server/challenges";
+import type { HistoryEntry } from "@/server/log";
 import { DomainError } from "@/server/errors";
 import { evaluatorsDirectory } from "@/server/members";
-import { reviewBoard } from "@/server/review";
+import { reviewBoard, type ReviewBoard } from "@/server/review";
 import { requireUser } from "@/server/session";
 import { EvaluatorToggle, PublishResultsButton, StatusControls, SubmissionStatusSelect } from "./controls";
 import { ResultsForm } from "./results-form";
@@ -23,14 +24,14 @@ export default async function ManageChallenge(props: PageProps<"/admin/challenge
   const sp = await props.searchParams;
   let b;
   try {
-    b = reviewBoard(user, id);
+    b = await reviewBoard(user, id);
   } catch (e) {
     if (e instanceof DomainError) notFound();
     throw e;
   }
   const c = b.challenge;
   const phase = challengePhase(c);
-  const detail = getChallengeBySlug(c.slug, user);
+  const detail = await getChallengeBySlug(c.slug, user);
   const tab = typeof sp.tab === "string" ? sp.tab : "overview";
   const published = c.status === "results_published";
   const evaluatorTotal = b.evaluators.length;
@@ -49,7 +50,7 @@ export default async function ManageChallenge(props: PageProps<"/admin/challenge
 
   return (
     <div className="space-y-6">
-      <Link href="/admin" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-ink"><ArrowLeft className="size-4" /> Painel</Link>
+      <Breadcrumbs items={[{ label: "Painel", href: "/admin" }, { label: c.title }]} />
       {sp.created && <Notice tone="ok">Rascunho criado. Reveja os detalhes e publique quando estiver pronto.</Notice>}
       {sp.saved && <Notice tone="ok">Alterações guardadas.</Notice>}
 
@@ -111,7 +112,7 @@ export default async function ManageChallenge(props: PageProps<"/admin/challenge
                   <li key={r.submission.id}>
                     <Link href={`/evaluate/${r.submission.id}`} className="flex items-center gap-3 px-5 py-3 hover:bg-sunken/40">
                       {r.rank ? <RankMedal rank={r.rank} /> : <span className="w-8 text-center text-faint">—</span>}
-                      <ProjectLogo name={r.project.name} hue={r.project.logoHue} size={34} />
+                      <ProjectLogo name={r.project.name} hue={r.project.logoHue} fileId={r.project.logoFileId} size={34} />
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-medium">{r.project.name}</div>
                         <div className="text-[12px] text-muted">{r.evaluationCount}/{evaluatorTotal} avaliações{!r.viewerEvaluated && !published && " · falta a sua"}</div>
@@ -167,7 +168,7 @@ export default async function ManageChallenge(props: PageProps<"/admin/challenge
                       <td className="px-4 py-3">{r.rank ? <RankMedal rank={r.rank} /> : <span className="text-faint">—</span>}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2.5">
-                          <ProjectLogo name={r.project.name} hue={r.project.logoHue} size={32} />
+                          <ProjectLogo name={r.project.name} hue={r.project.logoHue} fileId={r.project.logoFileId} size={32} />
                           <div className="min-w-0">
                             <Link href={`/evaluate/${r.submission.id}`} className="font-medium hover:underline">{r.project.name}</Link>
                             <div className="max-w-[260px] truncate text-[12px] text-muted">{r.project.tagline}</div>
@@ -204,7 +205,7 @@ export default async function ManageChallenge(props: PageProps<"/admin/challenge
           <Card>
             <CardHeader title="Atribuídos" subtitle="Podem ver e avaliar todas as submissões deste desafio" />
             <ul className="divide-y divide-line/70">
-              {evaluatorsDirectory().map((ev) => {
+              {(await evaluatorsDirectory()).map((ev) => {
                 const assigned = b.evaluators.some((x) => x.id === ev.id);
                 const done = b.rows.filter((r) => r.evaluations.some((e) => e.evaluatorId === ev.id)).length;
                 return (
@@ -284,7 +285,7 @@ export default async function ManageChallenge(props: PageProps<"/admin/challenge
   );
 }
 
-function HistoryList({ items }: { items: ReturnType<typeof reviewBoard>["history"] }) {
+function HistoryList({ items }: { items: HistoryEntry[] }) {
   if (items.length === 0) return <p className="p-5 text-sm text-muted">Sem registos.</p>;
   return (
     <ol className="divide-y divide-line/70">
@@ -301,13 +302,13 @@ function HistoryList({ items }: { items: ReturnType<typeof reviewBoard>["history
   );
 }
 
-function FinalResults({ rows }: { rows: ReturnType<typeof getChallengeBySlug>["results"] }) {
+function FinalResults({ rows }: { rows: ChallengeDetail["results"] }) {
   return (
     <Card className="divide-y divide-line/70">
       {rows.map((r) => (
         <div key={r.projectSlug} className="flex items-center gap-3 px-5 py-3">
           <RankMedal rank={r.rank} />
-          <ProjectLogo name={r.projectName} hue={r.projectLogoHue} size={34} />
+          <ProjectLogo name={r.projectName} hue={r.projectLogoHue} fileId={r.projectLogoFileId} size={34} />
           <div className="min-w-0 flex-1">
             <Link href={`/projects/${r.projectSlug}`} className="text-sm font-medium hover:underline">{r.projectName}</Link>
             <div className="text-[12px] text-muted">{r.prizeTitle ? `${r.prizeTitle} · ${r.prizeValue}` : "Sem prémio"}{r.note && ` · ${r.note}`}</div>
@@ -319,7 +320,7 @@ function FinalResults({ rows }: { rows: ReturnType<typeof getChallengeBySlug>["r
   );
 }
 
-function Compare({ board, ids, challengeId }: { board: ReturnType<typeof reviewBoard>; ids: string[]; challengeId: string }) {
+function Compare({ board, ids, challengeId }: { board: ReviewBoard; ids: string[]; challengeId: string }) {
   const cols = board.rows.filter((r) => ids.includes(r.submission.id));
   const toggle = (sid: string) => {
     const next = ids.includes(sid) ? ids.filter((x) => x !== sid) : [...ids, sid].slice(-5);
@@ -345,7 +346,7 @@ function Compare({ board, ids, challengeId }: { board: ReturnType<typeof reviewB
                 {cols.map((r) => (
                   <th key={r.submission.id} className="px-4 py-3 text-left">
                     <Link href={`/evaluate/${r.submission.id}`} className="flex items-center gap-2 font-semibold hover:underline">
-                      <ProjectLogo name={r.project.name} hue={r.project.logoHue} size={26} /> {r.project.name}
+                      <ProjectLogo name={r.project.name} hue={r.project.logoHue} fileId={r.project.logoFileId} size={26} /> {r.project.name}
                     </Link>
                   </th>
                 ))}

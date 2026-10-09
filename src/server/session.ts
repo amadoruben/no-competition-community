@@ -1,39 +1,24 @@
 import "server-only";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import type { Role, User } from "@/db/schema";
-import { createSession, deleteSession, userForSessionToken } from "./auth";
+import { resolveUser } from "./accounts";
+import { auth } from "./auth";
 
-const COOKIE = "ncc_session";
-
+/** The signed-in application user for this request (validated by the auth provider). */
 export const currentUser = cache(async (): Promise<User | null> => {
-  const token = (await cookies()).get(COOKIE)?.value;
-  return token ? userForSessionToken(token) : null;
+  const identity = await auth().currentIdentity();
+  return identity ? resolveUser(identity) : null;
 });
 
-/** For pages: redirect to login when signed out, home when role is wrong. */
+/** For pages: redirect to login when signed out, home when the role is wrong. */
 export async function requireUser(roles?: Role[]): Promise<User> {
   const user = await currentUser();
   if (!user) redirect("/login");
-  if (roles && !roles.includes(user.role)) redirect("/dashboard");
+  if (roles && !roles.includes(user.role)) redirect(homeFor(user));
   return user;
 }
 
-export async function startSession(userId: string) {
-  const { token, expiresAt } = createSession(userId);
-  (await cookies()).set(COOKIE, token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production" && process.env.INSECURE_COOKIES !== "1",
-    path: "/",
-    expires: expiresAt,
-  });
-}
-
-export async function endSession() {
-  const jar = await cookies();
-  const token = jar.get(COOKIE)?.value;
-  if (token) deleteSession(token);
-  jar.delete(COOKIE);
+export function homeFor(user: Pick<User, "role">) {
+  return user.role === "investor" ? "/admin" : user.role === "evaluator" ? "/review" : "/dashboard";
 }

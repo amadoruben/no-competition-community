@@ -1,8 +1,8 @@
-import { MapPin, Search, Users } from "lucide-react";
+import { MapPin, Users } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { RoleTag } from "@/components/domain";
-import { Avatar, Card, EmptyState, PageHeader } from "@/components/ui";
+import { Avatar, Card, EmptyState, PageHeader, Pagination, SearchBox } from "@/components/ui";
 import { listMembers } from "@/server/members";
 import { requireUser } from "@/server/session";
 
@@ -12,28 +12,24 @@ export default async function MembersPage(props: PageProps<"/members">) {
   await requireUser();
   const sp = await props.searchParams;
   const q = typeof sp.q === "string" ? sp.q : undefined;
-  const rows = listMembers(q);
+  const page = Number(sp.page) || 1;
+  const res = await listMembers({ q, page });
   return (
     <div>
       <PageHeader
         title="Membros"
         description="Fundadores, engenheiros, designers e avaliadores. Encontre equipa ou quem já resolveu o seu problema."
-        actions={
-          <form className="relative w-full sm:w-64">
-            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-faint" />
-            <input name="q" defaultValue={q} placeholder="Nome, competência, cidade" aria-label="Procurar membros" className="h-10 w-full rounded-full bg-surface pr-3 pl-9 text-sm ring-1 ring-line ring-inset focus:ring-2 focus:ring-ink focus:outline-none" />
-          </form>
-        }
+        actions={<SearchBox defaultValue={q} placeholder="Nome, competência, cidade" label="Procurar membros" />}
       />
-      {rows.length === 0 ? (
-        <Card><EmptyState icon={<Users className="size-5" />} title="Nenhum membro encontrado" /></Card>
+      {res.rows.length === 0 ? (
+        <Card><EmptyState icon={<Users className="size-5" />} title="Nenhum membro encontrado">Experimente outro termo.</EmptyState></Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {rows.map(({ u, projectCount, challengeCount }) => (
+          {res.rows.map(({ u, projectCount, challengeCount }) => (
             <Link key={u.id} href={`/members/${u.handle}`} className="group">
               <Card className="flex h-full flex-col p-4 transition-shadow group-hover:shadow-[var(--shadow-pop)]">
                 <div className="flex items-start gap-3">
-                  <Avatar name={u.name} hue={u.avatarHue} size={44} />
+                  <Avatar name={u.name} hue={u.avatarHue} fileId={u.avatarFileId} size={44} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="truncate font-semibold group-hover:underline">{u.name}</span>
@@ -56,6 +52,7 @@ export default async function MembersPage(props: PageProps<"/members">) {
           ))}
         </div>
       )}
+      <Pagination page={res.page} pages={res.pages} total={res.total} label="membros" href={(n) => `/members?${new URLSearchParams({ ...(q ? { q } : {}), page: String(n) })}`} />
     </div>
   );
 }

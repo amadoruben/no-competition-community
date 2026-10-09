@@ -9,7 +9,7 @@ export const metadata: Metadata = { title: "Aprender" };
 
 export default async function LearnPage() {
   const user = await requireUser();
-  const courses = listCourses(user);
+  const courses = await listCourses(user);
   return (
     <div>
       <PageHeader title="Aprender" description="Percursos curtos e práticos para chegar a cada desafio com um projecto mais forte." />

@@ -1,29 +1,30 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { challenges, participations, projectMembers, projects, submissions, type User } from "@/db/schema";
 import { canEnroll, canSubmit, challengePhase, PHASE_LABEL } from "@/lib/challenge-state";
 import { conflict, forbidden, invalid, notFound } from "./errors";
 import { isProjectMember } from "./permissions";
-import { optionalUrl, parse, text } from "./validation";
+import { isUuid, optionalUrl, parse, text } from "./validation";
 
-function loadChallenge(id: string) {
-  const c = db.select().from(challenges).where(eq(challenges.id, id)).get();
+async function loadChallenge(id: string) {
+  const [c] = isUuid(id) ? await db.select().from(challenges).where(eq(challenges.id, id)).limit(1) : [];
   if (!c || c.status === "draft") throw notFound("Desafio não encontrado.");
   return c;
 }
 
-export function enroll(actor: User, challengeId: string) {
+export async function enroll(actor: User, challengeId: string) {
   if (actor.role !== "member") throw forbidden("Apenas membros podem participar em desafios.");
-  const c = loadChallenge(challengeId);
+  const c = await loadChallenge(challengeId);
   if (!canEnroll(c)) throw conflict(`As inscrições não estão abertas (${PHASE_LABEL[challengePhase(c)].toLowerCase()}).`);
-  const existing = db
+  // Idempotent: the unique (challenge, user) index absorbs double submits.
+  await db.insert(participations).values({ challengeId, userId: actor.id }).onConflictDoNothing();
+  const [p] = await db
     .select()
     .from(participations)
     .where(and(eq(participations.challengeId, challengeId), eq(participations.userId, actor.id)))
-    .get();
-  if (existing) return existing;
-  return db.insert(participations).values({ challengeId, userId: actor.id }).returning().get();
+    .limit(1);
+  return p;
 }
 
 const submissionInput = z.object({
@@ -38,55 +39,50 @@ const submissionInput = z.object({
  * Submit (or update, until the deadline) a project to a challenge.
  * Enrols the member automatically if they had not enrolled yet.
  */
-export function submitProject(actor: User, challengeId: string, input: unknown) {
+export async function submitProject(actor: User, challengeId: string, input: unknown) {
   if (actor.role !== "member") throw forbidden("Apenas membros podem submeter projectos.");
-  const c = loadChallenge(challengeId);
+  const c = await loadChallenge(challengeId);
   if (!canSubmit(c)) throw conflict(`As submissões estão fechadas (${PHASE_LABEL[challengePhase(c)].toLowerCase()}).`);
   const v = parse(submissionInput, input);
 
-  const project = db.select().from(projects).where(eq(projects.id, v.projectId)).get();
+  const [project] = isUuid(v.projectId) ? await db.select().from(projects).where(eq(projects.id, v.projectId)).limit(1) : [];
   if (!project) throw invalid("Projecto inválido.", { projectId: "Projecto não encontrado." });
-  if (!isProjectMember(actor.id, project.id))
-    throw forbidden("Só pode submeter projectos de que faz parte.");
-  const teamSize = db.select({ n: sql<number>`count(*)` }).from(projectMembers).where(eq(projectMembers.projectId, project.id)).get()!.n;
+  if (!(await isProjectMember(actor.id, project.id))) throw forbidden("Só pode submeter projectos de que faz parte.");
+  const [{ n: teamSize }] = await db.select({ n: count() }).from(projectMembers).where(eq(projectMembers.projectId, project.id));
   if (teamSize > c.maxTeamSize)
     throw invalid(`A equipa tem ${teamSize} pessoas; este desafio permite no máximo ${c.maxTeamSize}.`, { projectId: "Equipa demasiado grande." });
 
-  const participation = db
+  const [participation] = await db
     .select()
     .from(participations)
     .where(and(eq(participations.challengeId, challengeId), eq(participations.userId, actor.id)))
-    .get();
+    .limit(1);
   if (participation?.projectId && participation.projectId !== project.id) {
-    const other = db
+    const [other] = await db
       .select({ id: submissions.id })
       .from(submissions)
       .where(and(eq(submissions.challengeId, challengeId), eq(submissions.projectId, participation.projectId)))
-      .get();
+      .limit(1);
     if (other) throw conflict("Já submeteu outro projecto a este desafio.");
   }
 
-  return db.transaction((tx) => {
-    if (participation) tx.update(participations).set({ projectId: project.id }).where(eq(participations.id, participation.id)).run();
-    else tx.insert(participations).values({ challengeId, userId: actor.id, projectId: project.id }).run();
-
-    const existing = tx
-      .select()
+  const values = { summary: v.summary, details: v.details, deliverableUrl: v.deliverableUrl!, videoUrl: v.videoUrl };
+  return db.transaction(async (tx) => {
+    await tx
+      .insert(participations)
+      .values({ challengeId, userId: actor.id, projectId: project.id })
+      .onConflictDoUpdate({ target: [participations.challengeId, participations.userId], set: { projectId: project.id } });
+    // Upsert on (challenge, project): a teammate submitting again updates the same entry.
+    const [existing] = await tx
+      .select({ id: submissions.id })
       .from(submissions)
       .where(and(eq(submissions.challengeId, challengeId), eq(submissions.projectId, project.id)))
-      .get();
-    const values = {
-      summary: v.summary,
-      details: v.details,
-      deliverableUrl: v.deliverableUrl!,
-      videoUrl: v.videoUrl,
-    };
-    if (existing) {
-      return { submission: tx.update(submissions).set({ ...values, updatedAt: new Date() }).where(eq(submissions.id, existing.id)).returning().get(), updated: true };
-    }
-    return {
-      submission: tx.insert(submissions).values({ ...values, challengeId, projectId: project.id, submittedById: actor.id }).returning().get(),
-      updated: false,
-    };
+      .limit(1);
+    const [submission] = await tx
+      .insert(submissions)
+      .values({ ...values, challengeId, projectId: project.id, submittedById: actor.id })
+      .onConflictDoUpdate({ target: [submissions.challengeId, submissions.projectId], set: { ...values, updatedAt: new Date() } })
+      .returning();
+    return { submission, updated: !!existing };
   });
 }

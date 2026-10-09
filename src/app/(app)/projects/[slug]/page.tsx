@@ -1,9 +1,9 @@
-import { ArrowLeft, Code2, ExternalLink, Globe, Pencil, PlayCircle, Trophy } from "lucide-react";
+import { Code2, ExternalLink, Globe, Pencil, PlayCircle, Trophy } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PersonLine, StageBadge } from "@/components/domain";
-import { Avatar, Badge, ButtonLink, Card, CardHeader, EmptyState, Notice, ProjectLogo, Prose } from "@/components/ui";
+import { Avatar, Badge, Breadcrumbs, ButtonLink, Card, CardHeader, EmptyState, Notice, ProjectLogo, Prose } from "@/components/ui";
 import { fmtDate, timeAgo } from "@/lib/format";
 import { OPPORTUNITY_TONE, SUBMISSION_STATUS_LABEL } from "@/lib/labels";
 import { DomainError } from "@/server/errors";
@@ -12,9 +12,9 @@ import { OPPORTUNITY_LABEL } from "@/server/review";
 import { requireUser } from "@/server/session";
 import { UpdateForm } from "./update-form";
 
-function load(slug: string, user: Awaited<ReturnType<typeof requireUser>>) {
+async function load(slug: string, user: Awaited<ReturnType<typeof requireUser>>) {
   try {
-    return getProjectBySlug(slug, user);
+    return await getProjectBySlug(slug, user);
   } catch (e) {
     if (e instanceof DomainError) notFound();
     throw e;
@@ -23,13 +23,13 @@ function load(slug: string, user: Awaited<ReturnType<typeof requireUser>>) {
 
 export async function generateMetadata(props: PageProps<"/projects/[slug]">): Promise<Metadata> {
   const user = await requireUser();
-  return { title: load((await props.params).slug, user).project.name };
+  return { title: (await load((await props.params).slug, user)).project.name };
 }
 
 export default async function ProjectPage(props: PageProps<"/projects/[slug]">) {
   const user = await requireUser();
   const sp = await props.searchParams;
-  const d = load((await props.params).slug, user);
+  const d = await load((await props.params).slug, user);
   const p = d.project;
   const links = [
     { href: p.websiteUrl, label: "Website", icon: Globe },
@@ -39,9 +39,7 @@ export default async function ProjectPage(props: PageProps<"/projects/[slug]">) 
 
   return (
     <div className="space-y-6">
-      <Link href="/projects" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-ink">
-        <ArrowLeft className="size-4" /> Projectos
-      </Link>
+      <Breadcrumbs items={[{ label: "Projectos", href: "/projects" }, { label: p.name }]} />
       {sp.created && <Notice tone="ok">Projecto criado. Complete a página e partilhe a primeira actualização.</Notice>}
       {sp.saved && <Notice tone="ok">Alterações guardadas.</Notice>}
 
@@ -50,7 +48,7 @@ export default async function ProjectPage(props: PageProps<"/projects/[slug]">) 
         <div className="px-5 pb-6 sm:px-8">
           <div className="-mt-10 flex flex-col gap-4 sm:-mt-12 sm:flex-row sm:items-end sm:justify-between">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-5">
-              <ProjectLogo name={p.name} hue={p.logoHue} size={88} className="ring-4 ring-surface" />
+              <ProjectLogo name={p.name} hue={p.logoHue} fileId={p.logoFileId} size={88} className="ring-4 ring-surface" />
               <div className="sm:pt-14">
                 <h1 className="font-display text-[28px] leading-tight font-semibold sm:text-[34px]">{p.name}</h1>
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted">
@@ -131,7 +129,7 @@ export default async function ProjectPage(props: PageProps<"/projects/[slug]">) 
             <ul className="space-y-3 p-5">
               {d.team.map((t) => (
                 <li key={t.id}>
-                  <PersonLine name={t.name} handle={t.handle} hue={t.avatarHue} sub={t.title || t.headline} />
+                  <PersonLine name={t.name} handle={t.handle} hue={t.avatarHue} fileId={t.avatarFileId} sub={t.title || t.headline} />
                 </li>
               ))}
             </ul>

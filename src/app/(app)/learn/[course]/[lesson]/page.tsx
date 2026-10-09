@@ -12,7 +12,7 @@ export default async function LessonPage(props: PageProps<"/learn/[course]/[less
   const { course, lesson } = await props.params;
   let d;
   try {
-    d = getCourse(user, course);
+    d = await getCourse(user, course);
   } catch (e) {
     if (e instanceof DomainError) notFound();
     throw e;

@@ -13,7 +13,7 @@ export default async function ReviewChallenge(props: PageProps<"/review/[challen
   const { challengeId } = await props.params;
   let b;
   try {
-    b = reviewBoard(user, challengeId);
+    b = await reviewBoard(user, challengeId);
   } catch (e) {
     if (e instanceof DomainError) notFound();
     throw e;

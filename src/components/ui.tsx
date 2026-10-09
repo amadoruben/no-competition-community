@@ -105,36 +105,35 @@ const initials = (name: string) =>
     .map((w) => w[0]!.toUpperCase())
     .join("");
 
-export function Avatar({ name, hue, size = 36, className }: { name: string; hue: number; size?: number; className?: string }) {
+/** Stable, provider-neutral URL for an uploaded file. */
+export const fileUrl = (id: string) => `/files/${id}`;
+
+export function Avatar({ name, hue, size = 36, fileId, className }: { name: string; hue: number; size?: number; fileId?: string | null; className?: string }) {
+  const box = { width: size, height: size };
+  if (fileId)
+    // eslint-disable-next-line @next/next/no-img-element -- auth-gated, provider-neutral URL; no image optimiser needed
+    return <img src={fileUrl(fileId)} alt="" width={size} height={size} loading="lazy" className={clsx("shrink-0 rounded-full object-cover", className)} style={box} />;
   return (
     <span
       aria-hidden
       className={clsx("inline-grid shrink-0 place-items-center rounded-full font-semibold select-none", className)}
-      style={{
-        width: size,
-        height: size,
-        fontSize: Math.round(size * 0.38),
-        background: `hsl(${hue} 70% 88%)`,
-        color: `hsl(${hue} 55% 25%)`,
-      }}
+      style={{ ...box, fontSize: Math.round(size * 0.38), background: `hsl(${hue} 70% 88%)`, color: `hsl(${hue} 55% 25%)` }}
     >
       {initials(name)}
     </span>
   );
 }
 
-export function ProjectLogo({ name, hue, size = 44, className }: { name: string; hue: number; size?: number; className?: string }) {
+export function ProjectLogo({ name, hue, size = 44, fileId, className }: { name: string; hue: number; size?: number; fileId?: string | null; className?: string }) {
+  const box = { width: size, height: size, borderRadius: Math.round(size * 0.28) };
+  if (fileId)
+    // eslint-disable-next-line @next/next/no-img-element -- see Avatar
+    return <img src={fileUrl(fileId)} alt="" width={size} height={size} loading="lazy" className={clsx("shrink-0 bg-surface object-cover ring-1 ring-line", className)} style={box} />;
   return (
     <span
       aria-hidden
       className={clsx("inline-grid shrink-0 place-items-center font-display font-bold text-white select-none", className)}
-      style={{
-        width: size,
-        height: size,
-        borderRadius: Math.round(size * 0.28),
-        fontSize: Math.round(size * 0.42),
-        background: `linear-gradient(140deg, hsl(${hue} 70% 45%), hsl(${hue + 30} 65% 28%))`,
-      }}
+      style={{ ...box, fontSize: Math.round(size * 0.42), background: `linear-gradient(140deg, hsl(${hue} 70% 45%), hsl(${hue + 30} 65% 28%))` }}
     >
       {name.trim()[0]?.toUpperCase()}
     </span>
@@ -260,6 +259,123 @@ export function ChallengeCover({ hue, className, children }: { hue: number; clas
   return (
     <div className={clsx("cover relative overflow-hidden", className)} style={{ ["--h" as string]: hue }}>
       {children}
+    </div>
+  );
+}
+
+// Navigation helpers -------------------------------------------------------------
+
+export function Breadcrumbs({ items }: { items: { label: string; href?: string }[] }) {
+  return (
+    <nav aria-label="Localização" className="mb-4 text-sm">
+      <ol className="flex flex-wrap items-center gap-1.5 text-muted">
+        {items.map((it, i) => (
+          <li key={i} className="flex items-center gap-1.5">
+            {i > 0 && <span aria-hidden className="text-faint">/</span>}
+            {it.href ? (
+              <Link href={it.href} className="hover:text-ink hover:underline">
+                {it.label}
+              </Link>
+            ) : (
+              <span aria-current="page" className="max-w-[40ch] truncate text-ink">
+                {it.label}
+              </span>
+            )}
+          </li>
+        ))}
+      </ol>
+    </nav>
+  );
+}
+
+/** Server-rendered pagination; `href(page)` builds the link for each page. */
+export function Pagination({ page, pages, href, total, label = "resultados" }: { page: number; pages: number; href: (p: number) => string; total?: number; label?: string }) {
+  if (pages <= 1) return total !== undefined ? <p className="mt-4 text-center text-[13px] text-muted">{total} {label}</p> : null;
+  const nums = Array.from(new Set([1, page - 1, page, page + 1, pages].filter((n) => n >= 1 && n <= pages))).sort((a, b) => a - b);
+  const cell = "inline-grid h-9 min-w-9 place-items-center rounded-full px-3 text-sm font-medium";
+  return (
+    <nav aria-label="Paginação" className="mt-6 flex flex-col items-center gap-2">
+      <ul className="flex items-center gap-1">
+        <li>
+          {page > 1 ? <Link href={href(page - 1)} className={clsx(cell, "hover:bg-sunken")} aria-label="Página anterior">‹</Link> : <span className={clsx(cell, "text-faint")}>‹</span>}
+        </li>
+        {nums.map((n, i) => (
+          <li key={n} className="flex items-center gap-1">
+            {i > 0 && n - nums[i - 1] > 1 && <span className="px-1 text-faint">…</span>}
+            <Link href={href(n)} aria-current={n === page ? "page" : undefined} className={clsx(cell, "tabular", n === page ? "bg-ink text-white" : "hover:bg-sunken")}>
+              {n}
+            </Link>
+          </li>
+        ))}
+        <li>
+          {page < pages ? <Link href={href(page + 1)} className={clsx(cell, "hover:bg-sunken")} aria-label="Página seguinte">›</Link> : <span className={clsx(cell, "text-faint")}>›</span>}
+        </li>
+      </ul>
+      {total !== undefined && <p className="text-[13px] text-muted">{total} {label}</p>}
+    </nav>
+  );
+}
+
+/** Pill-style filter links (single choice). */
+export function FilterChips({ items, active, label }: { items: { key: string; label: string; href: string }[]; active: string; label: string }) {
+  return (
+    <nav aria-label={label} className="scrollbar-none -mx-4 flex gap-1.5 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+      {items.map((it) => (
+        <Link
+          key={it.key}
+          href={it.href}
+          scroll={false}
+          aria-current={it.key === active ? "true" : undefined}
+          className={clsx(
+            "h-8 rounded-full px-3 text-[13px] leading-8 font-medium whitespace-nowrap ring-1 ring-inset transition-colors",
+            it.key === active ? "bg-ink text-white ring-ink" : "bg-surface text-ink-2 ring-line hover:ring-line-strong",
+          )}
+        >
+          {it.label}
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
+/** GET search box that preserves other query params. */
+export function SearchBox({ name = "q", defaultValue, placeholder, label, hidden = {} }: { name?: string; defaultValue?: string; placeholder: string; label: string; hidden?: Record<string, string | undefined> }) {
+  return (
+    <form role="search" className="relative w-full sm:w-64">
+      {Object.entries(hidden).map(([k, v]) => (v ? <input key={k} type="hidden" name={k} value={v} /> : null))}
+      <svg aria-hidden viewBox="0 0 24 24" className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" fill="none" stroke="currentColor" strokeWidth="2">
+        <circle cx="11" cy="11" r="7" />
+        <path d="m20 20-3.5-3.5" />
+      </svg>
+      <input
+        name={name}
+        type="search"
+        defaultValue={defaultValue}
+        placeholder={placeholder}
+        aria-label={label}
+        className="h-10 w-full rounded-full bg-surface pr-3 pl-9 text-sm ring-1 ring-line-strong ring-inset placeholder:text-faint focus:ring-2 focus:ring-ink focus:outline-none"
+      />
+    </form>
+  );
+}
+
+/** Loading placeholder. */
+export function Skeleton({ className }: { className?: string }) {
+  return <div aria-hidden className={clsx("animate-pulse rounded-lg bg-sunken", className)} />;
+}
+
+/** Full-width state for errors, missing permissions and unavailable services. */
+export function StatePanel({ icon, title, children, action, tone = "neutral" }: { icon?: ReactNode; title: string; children?: ReactNode; action?: ReactNode; tone?: "neutral" | "bad" | "warn" }) {
+  return (
+    <div role={tone === "bad" ? "alert" : undefined} className="mx-auto flex max-w-lg flex-col items-center px-6 py-16 text-center">
+      {icon && (
+        <div className={clsx("mb-4 grid size-12 place-items-center rounded-2xl", tone === "bad" ? "bg-bad-soft text-bad" : tone === "warn" ? "bg-warn-soft text-warn" : "bg-sunken text-muted")}>
+          {icon}
+        </div>
+      )}
+      <h1 className="font-display text-2xl font-semibold">{title}</h1>
+      {children && <div className="mt-2 text-[15px] text-ink-2">{children}</div>}
+      {action && <div className="mt-6 flex flex-wrap justify-center gap-2">{action}</div>}
     </div>
   );
 }

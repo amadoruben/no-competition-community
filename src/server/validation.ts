@@ -25,3 +25,7 @@ export const text = (min: number, max: number, label: string) =>
     .trim()
     .min(min, min <= 1 ? `${label} é obrigatório.` : `${label}: mínimo ${min} caracteres.`)
     .max(max, `${label}: máximo ${max} caracteres.`);
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Ids come from URLs and forms; anything that is not a UUID cannot exist. */
+export const isUuid = (v: unknown): v is string => typeof v === "string" && UUID.test(v);

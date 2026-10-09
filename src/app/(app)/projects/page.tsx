@@ -1,21 +1,34 @@
-import { Plus, Rocket, Search, Trophy } from "lucide-react";
+import { Plus, Rocket, Trophy } from "lucide-react";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { ProjectCard } from "@/components/domain";
-import { ButtonLink, Card, cx, EmptyState, PageHeader } from "@/components/ui";
+import { ButtonLink, Card, EmptyState, FilterChips, PageHeader, Pagination, SearchBox } from "@/components/ui";
 import { STAGE_LABEL } from "@/lib/labels";
-import { listProjects } from "@/server/projects";
+import { listProjects, PROJECT_SORTS } from "@/server/projects";
 import { requireUser } from "@/server/session";
 
 export const metadata: Metadata = { title: "Projectos" };
 
+const one = (v: string | string[] | undefined) => (typeof v === "string" && v ? v : undefined);
+
 export default async function ProjectsPage(props: PageProps<"/projects">) {
   const user = await requireUser();
   const sp = await props.searchParams;
-  const stage = typeof sp.stage === "string" ? sp.stage : undefined;
-  const q = typeof sp.q === "string" ? sp.q : undefined;
-  const rows = listProjects({ stage, q });
-  const link = (s?: string) => `/projects?${new URLSearchParams({ ...(s ? { stage: s } : {}), ...(q ? { q } : {}) })}`;
+  const stage = one(sp.stage);
+  const q = one(sp.q);
+  const sort = one(sp.sort) ?? "recent";
+  const page = Number(one(sp.page) ?? 1) || 1;
+  const res = await listProjects({ stage, q, sort, page });
+  const link = (o: { stage?: string; sort?: string; page?: number }) => {
+    const params = new URLSearchParams();
+    const st = "stage" in o ? o.stage : stage;
+    const so = "sort" in o ? o.sort : sort;
+    if (st) params.set("stage", st);
+    if (q) params.set("q", q);
+    if (so && so !== "recent") params.set("sort", so);
+    if (o.page && o.page > 1) params.set("page", String(o.page));
+    const qs = params.toString();
+    return qs ? `/projects?${qs}` : "/projects";
+  };
 
   return (
     <div>
@@ -24,31 +37,22 @@ export default async function ProjectsPage(props: PageProps<"/projects">) {
         description="O que a comunidade está a construir — do primeiro protótipo à tracção."
         actions={user.role === "member" && <ButtonLink href="/projects/new" variant="accent"><Plus className="size-4" /> Novo projecto</ButtonLink>}
       />
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="scrollbar-none -mx-4 flex gap-1.5 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-          {[["", "Todas as fases"], ...Object.entries(STAGE_LABEL)].map(([k, v]) => (
-            <Link
-              key={k}
-              href={link(k || undefined)}
-              className={cx("h-8 rounded-full px-3 text-[13px] leading-8 font-medium whitespace-nowrap ring-1 ring-inset", (stage ?? "") === k ? "bg-ink text-white ring-ink" : "bg-surface text-ink-2 ring-line hover:ring-line-strong")}
-            >
-              {v}
-            </Link>
-          ))}
+      <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <FilterChips label="Fase" active={stage ?? ""} items={[{ key: "", label: "Todas as fases", href: link({ stage: undefined }) }, ...Object.entries(STAGE_LABEL).map(([k, v]) => ({ key: k, label: v, href: link({ stage: k }) }))]} />
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <FilterChips label="Ordenar" active={sort} items={Object.entries(PROJECT_SORTS).map(([k, v]) => ({ key: k, label: v, href: link({ sort: k }) }))} />
+          <SearchBox defaultValue={q} placeholder="Procurar projectos" label="Procurar projectos" hidden={{ stage, sort: sort === "recent" ? undefined : sort }} />
         </div>
-        <form className="relative sm:w-64">
-          {stage && <input type="hidden" name="stage" value={stage} />}
-          <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-faint" />
-          <input name="q" defaultValue={q} placeholder="Procurar projectos" aria-label="Procurar projectos" className="h-9 w-full rounded-full bg-surface pr-3 pl-9 text-sm ring-1 ring-line ring-inset focus:ring-2 focus:ring-ink focus:outline-none" />
-        </form>
       </div>
-      {rows.length === 0 ? (
+      {res.rows.length === 0 ? (
         <Card>
-          <EmptyState icon={<Rocket className="size-5" />} title="Nenhum projecto encontrado">Experimente outro filtro ou termo de pesquisa.</EmptyState>
+          <EmptyState icon={<Rocket className="size-5" />} title="Nenhum projecto encontrado" action={(q || stage) && <ButtonLink href="/projects" variant="secondary">Limpar filtros</ButtonLink>}>
+            Experimente outro filtro ou termo de pesquisa.
+          </EmptyState>
         </Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {rows.map((r) => (
+          {res.rows.map((r) => (
             <ProjectCard
               key={r.p.id}
               p={r.p}
@@ -65,6 +69,7 @@ export default async function ProjectsPage(props: PageProps<"/projects">) {
           ))}
         </div>
       )}
+      <Pagination page={res.page} pages={res.pages} total={res.total} label={res.total === 1 ? "projecto" : "projectos"} href={(n) => link({ page: n })} />
     </div>
   );
 }

@@ -4,13 +4,15 @@ import { Megaphone, Pause, Play, Square, UserMinus, UserPlus } from "lucide-reac
 import { useState } from "react";
 import { publishResultsAction, setChallengeStatusAction, setEvaluatorAction, setSubmissionStatusAction } from "@/app/actions";
 import { ActionForm, SubmitButton } from "@/components/form";
+import { ConfirmSubmit } from "@/components/overlay";
+import { buttonClass } from "@/components/ui";
 import type { ChallengeStatus } from "@/db/schema";
 import { STATUS_TRANSITIONS } from "@/lib/challenge-state";
 
 const ACTIONS: Record<string, { label: string; icon: typeof Play; variant: "accent" | "secondary" | "danger"; confirm?: string }> = {
-  published: { label: "Publicar", icon: Play, variant: "accent", confirm: "Publicar o desafio? Fica visível para todos os membros." },
+  published: { label: "Publicar", icon: Play, variant: "accent", confirm: "O desafio fica visível para todos os membros e passa a aceitar inscrições." },
   paused: { label: "Pausar", icon: Pause, variant: "secondary" },
-  closed: { label: "Encerrar submissões", icon: Square, variant: "danger", confirm: "Encerrar submissões? Os membros deixam de poder submeter ou editar." },
+  closed: { label: "Encerrar submissões", icon: Square, variant: "danger", confirm: "Os membros deixam de poder submeter ou editar entregas. Pode reabrir mais tarde." },
 };
 
 export function StatusControls({ id, status }: { id: string; status: ChallengeStatus }) {
@@ -21,17 +23,19 @@ export function StatusControls({ id, status }: { id: string; status: ChallengeSt
       {options.map((to) => {
         const a = ACTIONS[to];
         const label = to === "published" && status !== "draft" ? (status === "closed" ? "Reabrir submissões" : "Retomar") : a.label;
-        return (
-          <SubmitButton
-            key={to}
-            name="status"
-            value={to}
-            variant={to === "published" && status === "closed" ? "secondary" : a.variant}
-            onClick={(e) => {
-              if (a.confirm && !window.confirm(a.confirm)) e.preventDefault();
-            }}
-          >
+        const variant = to === "published" && status === "closed" ? "secondary" : a.variant;
+        const content = (
+          <>
             <a.icon className="size-4" /> {label}
+          </>
+        );
+        return a.confirm ? (
+          <ConfirmSubmit key={to} name="status" value={to} title={`${label}?`} description={a.confirm} confirmLabel={label} tone={variant === "danger" ? "danger" : variant === "accent" ? "accent" : "primary"} className={buttonClass(variant)}>
+            {content}
+          </ConfirmSubmit>
+        ) : (
+          <SubmitButton key={to} name="status" value={to} variant={variant}>
+            {content}
           </SubmitButton>
         );
       })}
@@ -76,16 +80,15 @@ export function SubmissionStatusSelect({ submissionId, status }: { submissionId:
 export function PublishResultsButton({ challengeId }: { challengeId: string }) {
   return (
     <ActionForm action={publishResultsAction.bind(null, challengeId)}>
-      <SubmitButton
-        variant="accent"
-        size="lg"
-        pendingLabel="A publicar…"
-        onClick={(e) => {
-          if (!window.confirm("Publicar resultados? Ficam visíveis para toda a comunidade, é criado um anúncio e os rankings são actualizados. Esta acção não pode ser revertida.")) e.preventDefault();
-        }}
+      <ConfirmSubmit
+        title="Publicar resultados?"
+        description="Ficam visíveis para toda a comunidade, é criado um anúncio, o feedback é entregue às equipas e os pontos de mérito são atribuídos. Esta acção não pode ser revertida."
+        confirmLabel="Publicar resultados"
+        tone="accent"
+        className={buttonClass("accent", "lg")}
       >
         <Megaphone className="size-4" /> Publicar resultados
-      </SubmitButton>
+      </ConfirmSubmit>
     </ActionForm>
   );
 }

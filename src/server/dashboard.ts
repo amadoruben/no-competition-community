@@ -5,7 +5,7 @@ import { challengePhase } from "@/lib/challenge-state";
 import { daysUntil } from "@/lib/format";
 import { listChallenges } from "./challenges";
 import { listFeed } from "./community";
-import { leaderboard, memberPoints } from "./leaderboard";
+import { memberPoints } from "./leaderboard";
 import { projectsForUser } from "./projects";
 
 export interface Todo {
@@ -16,18 +16,22 @@ export interface Todo {
   urgent: boolean;
 }
 
-export function memberDashboard(user: User) {
-  const challenges = listChallenges(user).map((c) => ({ ...c, phase: challengePhase(c) }));
+export async function memberDashboard(user: User) {
+  const [challengeList, projects, points, feed] = await Promise.all([
+    listChallenges(user),
+    projectsForUser(user.id),
+    memberPoints(user.id),
+    listFeed(user, { limit: 4 }),
+  ]);
+  const challenges = challengeList.map((c) => ({ ...c, phase: challengePhase(c) }));
   const mine = challenges.filter((c) => c.viewerEnrolled);
   const discover = challenges.filter((c) => !c.viewerEnrolled && (c.phase === "open" || c.phase === "upcoming"));
-  const projects = projectsForUser(user.id);
   const lastUpdates = projects.length
-    ? db
+    ? await db
         .select({ projectId: projectUpdates.projectId, at: projectUpdates.createdAt })
         .from(projectUpdates)
         .where(inArray(projectUpdates.projectId, projects.map((p) => p.id)))
         .orderBy(desc(projectUpdates.createdAt))
-        .all()
     : [];
 
   const todos: Todo[] = [];
@@ -53,8 +57,7 @@ export function memberDashboard(user: User) {
       todos.push({ key: `update-${p.id}`, title: `Partilhar progresso de ${p.name}`, detail: last ? "Sem actualizações há mais de 2 semanas" : "Ainda sem actualizações", href: `/projects/${p.slug}#updates`, urgent: false });
   }
 
-  const points = memberPoints(user.id);
-  const board = leaderboard("overall", 1000);
+  const board = points.ranked;
   const myIndex = board.findIndex((r) => r.userId === user.id);
   const around = myIndex < 0 ? board.slice(0, 5) : board.slice(Math.max(0, myIndex - 2), Math.max(0, myIndex - 2) + 5);
 
@@ -65,6 +68,6 @@ export function memberDashboard(user: User) {
     todos,
     points,
     around,
-    feed: listFeed(user, { limit: 4 }),
+    feed: feed.items,
   };
 }

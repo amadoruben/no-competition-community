@@ -13,7 +13,7 @@ export const metadata: Metadata = { title: "Avaliações" };
 export default async function ReviewHome() {
   const user = await requireUser(["evaluator", "investor"]);
   if (user.role === "investor") redirect("/admin");
-  const rows = evaluatorOverview(user);
+  const rows = await evaluatorOverview(user);
   const pending = rows.reduce((s, r) => s + (r.phase === "results" ? 0 : r.viewerPending), 0);
   return (
     <div>
@@ -33,7 +33,7 @@ export default async function ReviewHome() {
                       <h2 className="font-display text-lg font-semibold group-hover:underline">{r.title}</h2>
                       <PhaseBadge phase={r.phase} />
                     </div>
-                    <p className="mt-1 text-[13px] text-muted">{r.submissions} submissões · prazo {fmtDay(r.submissionDeadline)}</p>
+                    <p className="mt-1 text-[13px] text-muted">{r.submissions} {r.submissions === 1 ? "submissão" : "submissões"} · prazo {fmtDay(r.submissionDeadline)}</p>
                     <div className="mt-auto pt-5">
                       <div className="mb-1.5 flex justify-between text-[12px]">
                         <span className={cx(r.viewerPending && r.phase !== "results" ? "font-medium text-warn" : "text-muted")}>{r.phase === "results" ? "Concluído" : r.viewerPending ? `${r.viewerPending} por avaliar` : "Tudo avaliado"}</span>

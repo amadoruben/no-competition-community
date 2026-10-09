@@ -14,7 +14,7 @@ export default async function PostPage(props: PageProps<"/community/[id]">) {
   const { id } = await props.params;
   let post;
   try {
-    post = getPost(user, id);
+    post = await getPost(user, id);
   } catch (e) {
     if (e instanceof DomainError) notFound();
     throw e;

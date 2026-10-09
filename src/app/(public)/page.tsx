@@ -5,7 +5,7 @@ import { Brand } from "@/components/brand";
 import { ChallengeCover, PhaseBadge, phaseTimeline } from "@/components/domain";
 import { ButtonLink } from "@/components/ui";
 import { publicOverview } from "@/server/challenges";
-import { currentUser } from "@/server/session";
+import { currentUser, homeFor } from "@/server/session";
 
 const steps = [
   { n: "01", title: "O investidor lança um desafio", body: "Problema, regras, critérios com pesos e prémios — tudo público desde o primeiro dia." },
@@ -23,8 +23,8 @@ const principles = [
 
 export default async function Landing() {
   const user = await currentUser();
-  if (user) redirect(user.role === "investor" ? "/admin" : user.role === "evaluator" ? "/review" : "/dashboard");
-  const { challenges, stats } = publicOverview();
+  if (user) redirect(homeFor(user));
+  const { challenges, stats } = await publicOverview();
 
   return (
     <div className="bg-paper">

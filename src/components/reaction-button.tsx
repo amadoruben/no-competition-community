@@ -4,6 +4,7 @@ import clsx from "clsx";
 import { HandHeart } from "lucide-react";
 import { useOptimistic, useTransition } from "react";
 import { reactAction } from "@/app/actions";
+import { toast } from "./toaster";
 
 export function ReactionButton({ postId, count, active }: { postId: string; count: number; active: boolean }) {
   const [, start] = useTransition();
@@ -16,7 +17,9 @@ export function ReactionButton({ postId, count, active }: { postId: string; coun
       onClick={() =>
         start(async () => {
           setState({ active: !state.active, count: state.count + (state.active ? -1 : 1) });
-          await reactAction(postId);
+          const r = await reactAction(postId);
+          // On failure the optimistic state reverts when the transition ends.
+          if (!r.ok) toast(r.error ?? "Não foi possível registar a reacção.", "bad");
         })
       }
       className={clsx(

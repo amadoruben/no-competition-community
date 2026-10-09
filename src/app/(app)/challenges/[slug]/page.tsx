@@ -1,20 +1,20 @@
-import { ArrowLeft, Award, CalendarClock, Check, ClipboardCheck, ExternalLink, FileText, Gauge, Lock, Pencil, Trophy, Users } from "lucide-react";
+import { Award, CalendarClock, Check, ClipboardCheck, ExternalLink, FileText, Gauge, Lock, Pencil, Trophy, Users } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChallengeCover, PhaseBadge, phaseTimeline, RankMedal, ScorePill, StageBadge } from "@/components/domain";
-import { Avatar, Badge, ButtonLink, Card, CardHeader, cx, EmptyState, Notice, ProjectLogo, Prose, Tabs } from "@/components/ui";
+import { Avatar, Badge, Breadcrumbs, ButtonLink, Card, CardHeader, cx, EmptyState, Notice, ProjectLogo, Prose, Tabs } from "@/components/ui";
 import { fmtDate, fmtDateTime } from "@/lib/format";
 import { PRIZE_KIND_LABEL } from "@/lib/labels";
-import { getChallengeBySlug } from "@/server/challenges";
+import { getChallengeBySlug, type ChallengeDetail } from "@/server/challenges";
 import { DomainError } from "@/server/errors";
 import { feedbackForTeam } from "@/server/review";
 import { requireUser } from "@/server/session";
 import { EnrollButton } from "./enroll-button";
 
-function load(slug: string, user: Awaited<ReturnType<typeof requireUser>>) {
+async function load(slug: string, user: Awaited<ReturnType<typeof requireUser>>) {
   try {
-    return getChallengeBySlug(slug, user);
+    return await getChallengeBySlug(slug, user);
   } catch (e) {
     if (e instanceof DomainError && e.code === "not_found") notFound();
     throw e;
@@ -24,20 +24,20 @@ function load(slug: string, user: Awaited<ReturnType<typeof requireUser>>) {
 export async function generateMetadata(props: PageProps<"/challenges/[slug]">): Promise<Metadata> {
   const user = await requireUser();
   const { slug } = await props.params;
-  return { title: load(slug, user).challenge.title };
+  return { title: (await load(slug, user)).challenge.title };
 }
 
 export default async function ChallengePage(props: PageProps<"/challenges/[slug]">) {
   const user = await requireUser();
   const { slug } = await props.params;
   const sp = await props.searchParams;
-  const d = load(slug, user);
+  const d = await load(slug, user);
   const c = d.challenge;
   const tab = typeof sp.tab === "string" ? sp.tab : "overview";
   const totalWeight = d.criteria.reduce((s, x) => s + x.weight, 0);
   const topPrize = d.prizes[0];
   const myResult = d.viewerSubmission && d.resultsPublished ? d.results.find((r) => r.projectSlug === d.viewerSubmission!.projectSlug) : undefined;
-  const feedback = d.viewerSubmission && d.resultsPublished ? feedbackForTeam(user, d.viewerSubmission.s.id) : [];
+  const feedback = d.viewerSubmission && d.resultsPublished ? await feedbackForTeam(user, d.viewerSubmission.s.id) : [];
 
   const tabs = [
     { key: "overview", label: "Visão geral" },
@@ -49,9 +49,7 @@ export default async function ChallengePage(props: PageProps<"/challenges/[slug]
 
   return (
     <div className="space-y-6">
-      <Link href="/challenges" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-ink">
-        <ArrowLeft className="size-4" /> Desafios
-      </Link>
+      <Breadcrumbs items={[{ label: "Desafios", href: "/challenges" }, { label: c.title }]} />
 
       {sp.submitted && <Notice tone="ok">Submissão entregue. Pode editá-la até ao fim do prazo.</Notice>}
       {sp.updated && <Notice tone="ok">Submissão actualizada.</Notice>}
@@ -176,7 +174,7 @@ export default async function ChallengePage(props: PageProps<"/challenges/[slug]
                       </Link>
                       {p.projectSlug ? (
                         <Link href={`/projects/${p.projectSlug}`} className="flex items-center gap-2.5 sm:w-64">
-                          <ProjectLogo name={p.projectName!} hue={p.projectLogoHue!} size={30} />
+                          <ProjectLogo name={p.projectName!} hue={p.projectLogoHue!} fileId={p.projectLogoFileId} size={30} />
                           <span className="min-w-0 flex-1 truncate text-sm font-medium hover:underline">{p.projectName}</span>
                           {p.submitted ? <Badge tone="ok">Submetido</Badge> : <StageBadge stage={p.projectStage!} />}
                         </Link>
@@ -194,7 +192,7 @@ export default async function ChallengePage(props: PageProps<"/challenges/[slug]
                 {d.results.map((r) => (
                   <Card key={r.projectSlug} className={cx("flex items-center gap-4 p-4", r.rank === 1 && "ring-2 ring-volt-strong")}>
                     <RankMedal rank={r.rank} />
-                    <ProjectLogo name={r.projectName} hue={r.projectLogoHue} />
+                    <ProjectLogo name={r.projectName} hue={r.projectLogoHue} fileId={r.projectLogoFileId} />
                     <Link href={`/projects/${r.projectSlug}`} className="min-w-0 flex-1">
                       <div className="font-semibold hover:underline">{r.projectName}</div>
                       <div className="truncate text-[13px] text-muted">{r.projectTagline}</div>
@@ -271,7 +269,7 @@ function ParticipationPanel({
   feedback,
   role,
 }: {
-  d: ReturnType<typeof getChallengeBySlug>;
+  d: ChallengeDetail;
   slug: string;
   myRank?: number;
   feedback: string[];

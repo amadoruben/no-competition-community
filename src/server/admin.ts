@@ -1,11 +1,11 @@
-import { asc, eq, sql } from "drizzle-orm";
+import { asc, count, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { challenges, evaluations, evaluatorAssignments, participations, results, submissions, type User } from "@/db/schema";
 import { challengePhase, type ChallengePhase } from "@/lib/challenge-state";
-import { decisionHistory } from "./log";
-import { assertInvestor, canReview } from "./permissions";
-import { listOpportunities } from "./review";
 import { forbidden } from "./errors";
+import { decisionHistory } from "./log";
+import { assertInvestor, isInvestor } from "./permissions";
+import { listOpportunities } from "./review";
 
 export interface NextAction {
   label: string;
@@ -31,61 +31,78 @@ export interface ChallengeRow {
   next: NextAction;
 }
 
-function challengeRows(viewer: User, onlyAssigned = false): ChallengeRow[] {
-  const all = db.select().from(challenges).orderBy(asc(challenges.submissionDeadline)).all();
-  return all
-    .filter((c) => (onlyAssigned ? canReview(viewer, c.id) && c.status !== "draft" : true))
-    .map((c) => {
-      const participants = db.select({ n: sql<number>`count(*)` }).from(participations).where(eq(participations.challengeId, c.id)).get()!.n;
-      const subs = db.select({ id: submissions.id }).from(submissions).where(eq(submissions.challengeId, c.id)).all();
-      const evals = db
-        .select({ evaluatorId: evaluations.evaluatorId, submissionId: evaluations.submissionId })
-        .from(evaluations)
-        .innerJoin(submissions, eq(submissions.id, evaluations.submissionId))
-        .where(eq(submissions.challengeId, c.id))
-        .all();
-      const evaluatorCount = db.select({ n: sql<number>`count(*)` }).from(evaluatorAssignments).where(eq(evaluatorAssignments.challengeId, c.id)).get()!.n;
-      const confirmed = db.select({ n: sql<number>`count(*)` }).from(results).where(eq(results.challengeId, c.id)).get()!.n;
-      const viewerPending = subs.filter((s) => !evals.some((e) => e.submissionId === s.id && e.evaluatorId === viewer.id)).length;
-      const phase = challengePhase(c);
-      const expected = subs.length * evaluatorCount;
+const tally = (rows: { k: string; n: number }[]) => new Map(rows.map((r) => [r.k, r.n]));
 
-      let next: NextAction;
-      if (c.status === "draft") next = { label: "Rever e publicar", tone: "volt" };
-      else if (phase === "results") next = { label: "Concluído", tone: "neutral" };
-      else if (confirmed > 0) next = { label: "Publicar resultados", tone: "volt" };
-      else if (phase === "reviewing" && c.status === "published") next = { label: "Prazo terminado — encerrar submissões", tone: "warn" };
-      else if (c.status === "closed")
-        next = evals.length < expected ? { label: `Avaliações ${evals.length}/${expected}`, tone: "info" } : { label: "Confirmar resultados", tone: "volt" };
-      else if (phase === "paused") next = { label: "Em pausa — retomar ou encerrar", tone: "warn" };
-      else if (phase === "upcoming") next = { label: "Aguarda abertura", tone: "neutral" };
-      else next = { label: `${subs.length} submissões recebidas`, tone: "info" };
+async function challengeRows(viewer: User, onlyAssigned = false): Promise<ChallengeRow[]> {
+  let list = await db.select().from(challenges).orderBy(asc(challenges.submissionDeadline));
+  if (onlyAssigned) {
+    const mine = await db.select({ id: evaluatorAssignments.challengeId }).from(evaluatorAssignments).where(eq(evaluatorAssignments.evaluatorId, viewer.id));
+    const ids = new Set(mine.map((m) => m.id));
+    list = list.filter((c) => c.status !== "draft" && (isInvestor(viewer) || ids.has(c.id)));
+  }
+  if (!list.length) return [];
+  const ids = list.map((c) => c.id);
+  const [parts, subs, evals, assigned, confirmed] = await Promise.all([
+    db.select({ k: participations.challengeId, n: count() }).from(participations).where(inArray(participations.challengeId, ids)).groupBy(participations.challengeId),
+    db.select({ id: submissions.id, challengeId: submissions.challengeId }).from(submissions).where(inArray(submissions.challengeId, ids)),
+    db
+      .select({ evaluatorId: evaluations.evaluatorId, submissionId: evaluations.submissionId, challengeId: submissions.challengeId })
+      .from(evaluations)
+      .innerJoin(submissions, eq(submissions.id, evaluations.submissionId))
+      .where(inArray(submissions.challengeId, ids)),
+    db.select({ k: evaluatorAssignments.challengeId, n: count() }).from(evaluatorAssignments).where(inArray(evaluatorAssignments.challengeId, ids)).groupBy(evaluatorAssignments.challengeId),
+    db.select({ k: results.challengeId, n: count() }).from(results).where(inArray(results.challengeId, ids)).groupBy(results.challengeId),
+  ]);
+  const partN = tally(parts);
+  const assignedN = tally(assigned);
+  const confirmedN = tally(confirmed);
+  // Evaluators only see their own progress, never colleagues'.
+  const visibleEvals = isInvestor(viewer) ? evals : evals.filter((e) => e.evaluatorId === viewer.id);
 
-      return {
-        id: c.id,
-        slug: c.slug,
-        title: c.title,
-        category: c.category,
-        coverHue: c.coverHue,
-        phase,
-        status: c.status,
-        submissionDeadline: c.submissionDeadline,
-        resultsDate: c.resultsDate,
-        participants,
-        submissions: subs.length,
-        evaluationsDone: evals.length,
-        evaluationsExpected: expected,
-        viewerPending,
-        resultsConfirmed: confirmed,
-        next,
-      };
-    });
+  return list.map((c) => {
+    const cSubs = subs.filter((s) => s.challengeId === c.id);
+    const cEvals = visibleEvals.filter((e) => e.challengeId === c.id);
+    const evaluatorCount = isInvestor(viewer) ? (assignedN.get(c.id) ?? 0) : 1;
+    const resultsConfirmed = isInvestor(viewer) ? (confirmedN.get(c.id) ?? 0) : 0;
+    const viewerPending = cSubs.filter((s) => !evals.some((e) => e.submissionId === s.id && e.evaluatorId === viewer.id)).length;
+    const phase = challengePhase(c);
+    const expected = cSubs.length * evaluatorCount;
+
+    let next: NextAction;
+    if (c.status === "draft") next = { label: "Rever e publicar", tone: "volt" };
+    else if (phase === "results") next = { label: "Concluído", tone: "neutral" };
+    else if (resultsConfirmed > 0) next = { label: "Publicar resultados", tone: "volt" };
+    else if (phase === "reviewing" && c.status === "published") next = { label: "Prazo terminado — encerrar submissões", tone: "warn" };
+    else if (c.status === "closed")
+      next = cEvals.length < expected ? { label: `Avaliações ${cEvals.length}/${expected}`, tone: "info" } : { label: "Confirmar resultados", tone: "volt" };
+    else if (phase === "paused") next = { label: "Em pausa — retomar ou encerrar", tone: "warn" };
+    else if (phase === "upcoming") next = { label: "Aguarda abertura", tone: "neutral" };
+    else next = { label: `${cSubs.length} ${cSubs.length === 1 ? "submissão recebida" : "submissões recebidas"}`, tone: "info" };
+
+    return {
+      id: c.id,
+      slug: c.slug,
+      title: c.title,
+      category: c.category,
+      coverHue: c.coverHue,
+      phase,
+      status: c.status,
+      submissionDeadline: c.submissionDeadline,
+      resultsDate: c.resultsDate,
+      participants: partN.get(c.id) ?? 0,
+      submissions: cSubs.length,
+      evaluationsDone: cEvals.length,
+      evaluationsExpected: expected,
+      viewerPending,
+      resultsConfirmed,
+      next,
+    };
+  });
 }
 
-export function investorOverview(actor: User) {
+export async function investorOverview(actor: User) {
   assertInvestor(actor);
-  const rows = challengeRows(actor);
-  const opps = listOpportunities(actor);
+  const [rows, opps, history] = await Promise.all([challengeRows(actor), listOpportunities(actor), decisionHistory(undefined, 8)]);
   return {
     rows,
     kpis: {
@@ -96,11 +113,11 @@ export function investorOverview(actor: User) {
       pipeline: opps.filter((o) => !["declined", "invested"].includes(o.o.status)).length,
     },
     opportunities: opps,
-    history: decisionHistory(undefined, 8),
+    history,
   };
 }
 
-export function evaluatorOverview(actor: User) {
+export async function evaluatorOverview(actor: User) {
   if (actor.role !== "evaluator" && actor.role !== "investor") throw forbidden();
   return challengeRows(actor, true);
 }

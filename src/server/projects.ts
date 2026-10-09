@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, or, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import {
@@ -18,7 +18,7 @@ import {
 import { slugify } from "@/lib/slug";
 import { forbidden, invalid, notFound } from "./errors";
 import { isInvestor, isProjectMember } from "./permissions";
-import { optionalUrl, parse, text } from "./validation";
+import { isUuid, optionalUrl, parse, text } from "./validation";
 
 const projectInput = z.object({
   name: text(2, 60, "Nome"),
@@ -34,37 +34,44 @@ const projectInput = z.object({
   repoUrl: optionalUrl,
 });
 
-function uniqueSlug(name: string, excludeId?: string) {
+async function uniqueSlug(name: string, excludeId?: string) {
   const base = slugify(name);
   let slug = base;
   for (let i = 2; ; i++) {
-    const hit = db.select({ id: projects.id }).from(projects).where(eq(projects.slug, slug)).get();
+    const [hit] = await db.select({ id: projects.id }).from(projects).where(eq(projects.slug, slug)).limit(1);
     if (!hit || hit.id === excludeId) return slug;
     slug = `${base}-${i}`;
   }
 }
 
-export function createProject(actor: User, input: unknown) {
+export async function loadProject(projectId: string) {
+  const [p] = isUuid(projectId) ? await db.select().from(projects).where(eq(projects.id, projectId)).limit(1) : [];
+  if (!p) throw notFound("Projecto não encontrado.");
+  return p;
+}
+
+export async function createProject(actor: User, input: unknown) {
   if (actor.role !== "member") throw forbidden("Apenas membros podem criar projectos.");
   const v = parse(projectInput, input);
-  return db.transaction((tx) => {
-    const p = tx.insert(projects).values({ ...v, slug: uniqueSlug(v.name), ownerId: actor.id }).returning().get();
-    tx.insert(projectMembers).values({ projectId: p.id, userId: actor.id, title: "Fundador(a)" }).run();
+  const slug = await uniqueSlug(v.name);
+  return db.transaction(async (tx) => {
+    const [p] = await tx.insert(projects).values({ ...v, slug, ownerId: actor.id }).returning();
+    await tx.insert(projectMembers).values({ projectId: p.id, userId: actor.id, title: "Fundador(a)" });
     return p;
   });
 }
 
-export function updateProject(actor: User, projectId: string, input: unknown) {
-  const p = db.select().from(projects).where(eq(projects.id, projectId)).get();
-  if (!p) throw notFound("Projecto não encontrado.");
-  if (!isProjectMember(actor.id, projectId)) throw forbidden("Apenas a equipa pode editar o projecto.");
+export async function updateProject(actor: User, projectId: string, input: unknown) {
+  const p = await loadProject(projectId);
+  if (!(await isProjectMember(actor.id, projectId))) throw forbidden("Apenas a equipa pode editar o projecto.");
   const v = parse(projectInput, input);
-  return db
+  const slug = p.name === v.name ? p.slug : await uniqueSlug(v.name, projectId);
+  const [updated] = await db
     .update(projects)
-    .set({ ...v, slug: p.name === v.name ? p.slug : uniqueSlug(v.name, projectId), updatedAt: new Date() })
+    .set({ ...v, slug, updatedAt: new Date() })
     .where(eq(projects.id, projectId))
-    .returning()
-    .get();
+    .returning();
+  return updated;
 }
 
 const updateInput = z.object({
@@ -73,14 +80,14 @@ const updateInput = z.object({
   shareToFeed: z.boolean().default(true),
 });
 
-export function addProjectUpdate(actor: User, projectId: string, input: unknown) {
-  if (!isProjectMember(actor.id, projectId)) throw forbidden("Apenas a equipa pode publicar actualizações.");
+export async function addProjectUpdate(actor: User, projectId: string, input: unknown) {
+  await loadProject(projectId);
+  if (!(await isProjectMember(actor.id, projectId))) throw forbidden("Apenas a equipa pode publicar actualizações.");
   const v = parse(updateInput, input);
-  return db.transaction((tx) => {
-    const u = tx.insert(projectUpdates).values({ projectId, authorId: actor.id, title: v.title, body: v.body }).returning().get();
-    tx.update(projects).set({ updatedAt: new Date() }).where(eq(projects.id, projectId)).run();
-    if (v.shareToFeed)
-      tx.insert(posts).values({ authorId: actor.id, kind: "progress", title: v.title, body: v.body, projectId }).run();
+  return db.transaction(async (tx) => {
+    const [u] = await tx.insert(projectUpdates).values({ projectId, authorId: actor.id, title: v.title, body: v.body }).returning();
+    await tx.update(projects).set({ updatedAt: new Date() }).where(eq(projects.id, projectId));
+    if (v.shareToFeed) await tx.insert(posts).values({ authorId: actor.id, kind: "progress", title: v.title, body: v.body, projectId });
     return u;
   });
 }
@@ -90,88 +97,114 @@ const memberInput = z.object({
   title: z.string().trim().max(60).default(""),
 });
 
-export function addProjectMember(actor: User, projectId: string, input: unknown) {
-  const p = db.select().from(projects).where(eq(projects.id, projectId)).get();
-  if (!p) throw notFound("Projecto não encontrado.");
+export async function addProjectMember(actor: User, projectId: string, input: unknown) {
+  const p = await loadProject(projectId);
   if (p.ownerId !== actor.id) throw forbidden("Apenas o fundador pode gerir a equipa.");
   const v = parse(memberInput, input);
-  const u = db.select().from(users).where(eq(users.handle, v.handle.replace(/^@/, ""))).get();
+  const [u] = await db.select().from(users).where(eq(users.handle, v.handle.replace(/^@/, ""))).limit(1);
   if (!u || u.role !== "member") throw invalid("Membro não encontrado.", { handle: "Nenhum membro com esse identificador." });
-  db.insert(projectMembers)
+  await db
+    .insert(projectMembers)
     .values({ projectId, userId: u.id, title: v.title })
-    .onConflictDoUpdate({ target: [projectMembers.projectId, projectMembers.userId], set: { title: v.title } })
-    .run();
+    .onConflictDoUpdate({ target: [projectMembers.projectId, projectMembers.userId], set: { title: v.title } });
 }
 
-export function projectsForUser(userId: string) {
-  return db
-    .select({ p: projects })
+export async function removeProjectMember(actor: User, projectId: string, userId: string) {
+  const p = await loadProject(projectId);
+  if (p.ownerId !== actor.id) throw forbidden("Apenas o fundador pode gerir a equipa.");
+  if (userId === p.ownerId) throw invalid("O fundador não pode ser removido da equipa.");
+  await db.delete(projectMembers).where(and(eq(projectMembers.projectId, projectId), eq(projectMembers.userId, userId)));
+}
+
+export async function projectsForUser(userId: string) {
+  const rows = await db
+    .selectDistinct({ p: projects })
     .from(projects)
     .leftJoin(projectMembers, eq(projectMembers.projectId, projects.id))
     .where(or(eq(projects.ownerId, userId), eq(projectMembers.userId, userId)))
-    .groupBy(projects.id)
-    .orderBy(desc(projects.updatedAt))
-    .all()
-    .map((r) => r.p);
+    .orderBy(desc(projects.updatedAt));
+  return rows.map((r) => r.p);
 }
 
-export function listProjects(filter: { stage?: string; category?: string; q?: string } = {}) {
-  const rows = db
-    .select({
-      p: projects,
-      ownerName: users.name,
-      ownerHandle: users.handle,
-      memberCount: sql<number>`(select count(*) from ${projectMembers} m where m.project_id = "projects"."id")`,
-      challengeCount: sql<number>`(select count(*) from ${submissions} s where s.project_id = "projects"."id")`,
-      bestRank: sql<number | null>`(select min(r.rank) from ${results} r join ${submissions} s on s.id = r.submission_id join ${challenges} c on c.id = r.challenge_id where s.project_id = "projects"."id" and c.status = 'results_published')`,
-    })
-    .from(projects)
-    .innerJoin(users, eq(users.id, projects.ownerId))
-    .orderBy(desc(projects.updatedAt))
-    .all();
-  const q = filter.q?.trim().toLowerCase();
-  return rows.filter(
-    (r) =>
-      (!filter.stage || r.p.stage === filter.stage) &&
-      (!filter.category || r.p.category === filter.category) &&
-      (!q || `${r.p.name} ${r.p.tagline} ${r.p.category}`.toLowerCase().includes(q)),
-  );
+export const PROJECT_SORTS = { recent: "Actividade recente", name: "Nome", newest: "Mais recentes" } as const;
+export type ProjectSort = keyof typeof PROJECT_SORTS;
+
+export async function listProjects(filter: { stage?: string; category?: string; q?: string; sort?: string; page?: number; pageSize?: number } = {}) {
+  const pageSize = filter.pageSize ?? 12;
+  const page = Math.max(1, filter.page ?? 1);
+  const conds: SQL[] = [];
+  if (filter.stage && (PROJECT_STAGES as readonly string[]).includes(filter.stage)) conds.push(eq(projects.stage, filter.stage as (typeof PROJECT_STAGES)[number]));
+  if (filter.category) conds.push(eq(projects.category, filter.category));
+  const q = filter.q?.trim();
+  if (q) {
+    const like = `%${q.replace(/[%_\\]/g, (m) => `\\${m}`)}%`;
+    conds.push(or(ilike(projects.name, like), ilike(projects.tagline, like), ilike(projects.category, like))!);
+  }
+  const where = conds.length ? and(...conds) : undefined;
+  const order =
+    filter.sort === "name" ? [asc(projects.name)] : filter.sort === "newest" ? [desc(projects.createdAt)] : [desc(projects.updatedAt)];
+
+  const [[{ total }], rows] = await Promise.all([
+    db.select({ total: count() }).from(projects).where(where),
+    db
+      .select({
+        p: projects,
+        ownerName: users.name,
+        ownerHandle: users.handle,
+        memberCount: sql<number>`(select count(*)::int from ${projectMembers} m where m.project_id = "projects"."id")`,
+        challengeCount: sql<number>`(select count(*)::int from ${submissions} s where s.project_id = "projects"."id")`,
+        bestRank: sql<number | null>`(select min(r.rank) from ${results} r join ${submissions} s on s.id = r.submission_id join ${challenges} c on c.id = r.challenge_id where s.project_id = "projects"."id" and c.status = 'results_published')`,
+      })
+      .from(projects)
+      .innerJoin(users, eq(users.id, projects.ownerId))
+      .where(where)
+      .orderBy(...order, asc(projects.id))
+      .limit(pageSize)
+      .offset((page - 1) * pageSize),
+  ]);
+  return { rows, total, page, pageSize, pages: Math.max(1, Math.ceil(total / pageSize)) };
 }
 
-export function getProjectBySlug(slug: string, viewer: User) {
-  const p = db.select().from(projects).where(eq(projects.slug, slug)).get();
+export async function getProjectBySlug(slug: string, viewer: User) {
+  const [p] = await db.select().from(projects).where(eq(projects.slug, slug)).limit(1);
   if (!p) throw notFound("Projecto não encontrado.");
-  const team = db
-    .select({ id: users.id, name: users.name, handle: users.handle, headline: users.headline, avatarHue: users.avatarHue, title: projectMembers.title })
-    .from(projectMembers)
-    .innerJoin(users, eq(users.id, projectMembers.userId))
-    .where(eq(projectMembers.projectId, p.id))
-    .all()
-    .sort((a, b) => (a.id === p.ownerId ? -1 : b.id === p.ownerId ? 1 : 0));
-  const updates = db
-    .select({ u: projectUpdates, authorName: users.name, authorHandle: users.handle, authorHue: users.avatarHue })
-    .from(projectUpdates)
-    .innerJoin(users, eq(users.id, projectUpdates.authorId))
-    .where(eq(projectUpdates.projectId, p.id))
-    .orderBy(desc(projectUpdates.createdAt))
-    .all();
-  const isMember = isProjectMember(viewer.id, p.id);
-  const subs = db
-    .select({
-      s: submissions,
-      challengeTitle: challenges.title,
-      challengeSlug: challenges.slug,
-      challengeStatus: challenges.status,
-      participantsVisible: challenges.participantsVisible,
-      rank: results.rank,
-      finalScore: results.finalScore,
-    })
-    .from(submissions)
-    .innerJoin(challenges, eq(challenges.id, submissions.challengeId))
-    .leftJoin(results, eq(results.submissionId, submissions.id))
-    .where(eq(submissions.projectId, p.id))
-    .orderBy(desc(submissions.submittedAt))
-    .all()
+  const [team, updates, isMember, subRows, enrolledChallenges, pipeline] = await Promise.all([
+    db
+      .select({ id: users.id, name: users.name, handle: users.handle, headline: users.headline, avatarHue: users.avatarHue, avatarFileId: users.avatarFileId, title: projectMembers.title })
+      .from(projectMembers)
+      .innerJoin(users, eq(users.id, projectMembers.userId))
+      .where(eq(projectMembers.projectId, p.id)),
+    db
+      .select({ u: projectUpdates, authorName: users.name, authorHandle: users.handle, authorHue: users.avatarHue })
+      .from(projectUpdates)
+      .innerJoin(users, eq(users.id, projectUpdates.authorId))
+      .where(eq(projectUpdates.projectId, p.id))
+      .orderBy(desc(projectUpdates.createdAt)),
+    isProjectMember(viewer.id, p.id),
+    db
+      .select({
+        s: submissions,
+        challengeTitle: challenges.title,
+        challengeSlug: challenges.slug,
+        challengeStatus: challenges.status,
+        participantsVisible: challenges.participantsVisible,
+        rank: results.rank,
+        finalScore: results.finalScore,
+      })
+      .from(submissions)
+      .innerJoin(challenges, eq(challenges.id, submissions.challengeId))
+      .leftJoin(results, eq(results.submissionId, submissions.id))
+      .where(eq(submissions.projectId, p.id))
+      .orderBy(desc(submissions.submittedAt)),
+    db
+      .select({ title: challenges.title, slug: challenges.slug })
+      .from(participations)
+      .innerJoin(challenges, eq(challenges.id, participations.challengeId))
+      .where(eq(participations.projectId, p.id))
+      .groupBy(challenges.id),
+    isInvestor(viewer) ? db.select().from(opportunities).where(eq(opportunities.projectId, p.id)).orderBy(desc(opportunities.updatedAt)) : Promise.resolve([]),
+  ]);
+  const subs = subRows
     .filter((r) => isMember || isInvestor(viewer) || r.participantsVisible)
     .map((r) => ({
       ...r,
@@ -179,26 +212,16 @@ export function getProjectBySlug(slug: string, viewer: User) {
       rank: r.challengeStatus === "results_published" ? r.rank : null,
       finalScore: r.challengeStatus === "results_published" ? r.finalScore : null,
     }));
-  const enrolledChallenges = db
-    .select({ title: challenges.title, slug: challenges.slug })
-    .from(participations)
-    .innerJoin(challenges, eq(challenges.id, participations.challengeId))
-    .where(eq(participations.projectId, p.id))
-    .all();
-  const pipeline = isInvestor(viewer)
-    ? db.select().from(opportunities).where(eq(opportunities.projectId, p.id)).orderBy(desc(opportunities.updatedAt)).all()
-    : [];
+  team.sort((a, b) => (a.id === p.ownerId ? -1 : b.id === p.ownerId ? 1 : 0));
   return { project: p, team, updates, submissions: subs, enrolledChallenges, isMember, isOwner: p.ownerId === viewer.id, opportunities: pipeline };
 }
 
-export function projectCategories() {
-  return db.selectDistinct({ c: projects.category }).from(projects).orderBy(asc(projects.category)).all().map((r) => r.c);
+export async function projectCategories() {
+  const rows = await db.selectDistinct({ c: projects.category }).from(projects).orderBy(asc(projects.category));
+  return rows.map((r) => r.c);
 }
 
-export function projectsByIds(ids: string[]) {
-  return ids.length ? db.select().from(projects).where(inArray(projects.id, ids)).all() : [];
-}
-
-export function projectMembersOf(projectId: string) {
-  return db.select({ userId: projectMembers.userId }).from(projectMembers).where(and(eq(projectMembers.projectId, projectId))).all().map((r) => r.userId);
+/** Lightweight id → name list for selectors. */
+export async function projectOptions() {
+  return db.select({ id: projects.id, name: projects.name }).from(projects).orderBy(asc(projects.name));
 }

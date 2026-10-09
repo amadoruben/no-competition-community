@@ -21,7 +21,7 @@ export default async function ChallengesPage(props: PageProps<"/challenges">) {
   const user = await requireUser();
   const sp = await props.searchParams;
   const active = FILTERS.some((f) => f.key === sp.f) ? String(sp.f) : "all";
-  const all = listChallenges(user);
+  const all = await listChallenges(user);
   const filters = user.role === "member" ? FILTERS : [...FILTERS.filter((f) => f.key !== "mine"), { key: "draft", label: "Rascunhos", phases: ["draft"] as ChallengePhase[] }];
   const f = filters.find((x) => x.key === active) ?? filters[0];
   const list = all.filter((c) => (f.key === "mine" ? c.viewerEnrolled : !f.phases || f.phases.includes(challengePhase(c))));

@@ -69,8 +69,8 @@ export default async function LeaderboardPage(props: PageProps<"/leaderboard">) 
   );
 }
 
-function Standings({ view, hint, me }: { view: LeaderboardView; hint: string; me: string }) {
-  const rows = leaderboard(view);
+async function Standings({ view, hint, me }: { view: LeaderboardView; hint: string; me: string }) {
+  const rows = await leaderboard(view);
   const value = (r: (typeof rows)[number]) => (view === "merit" ? r.merit : view === "participation" ? r.participation : r.total);
   if (rows.length === 0)
     return (
@@ -126,8 +126,8 @@ function Standings({ view, hint, me }: { view: LeaderboardView; hint: string; me
   );
 }
 
-function ByChallenge({ user, selected }: { user: Awaited<ReturnType<typeof requireUser>>; selected?: string }) {
-  const done = listChallenges(user).filter((c) => c.status === "results_published");
+async function ByChallenge({ user, selected }: { user: Awaited<ReturnType<typeof requireUser>>; selected?: string }) {
+  const done = (await listChallenges(user)).filter((c) => c.status === "results_published");
   if (done.length === 0)
     return (
       <Card>
@@ -135,7 +135,7 @@ function ByChallenge({ user, selected }: { user: Awaited<ReturnType<typeof requi
       </Card>
     );
   const current = done.find((c) => c.slug === selected) ?? done[0];
-  const d = getChallengeBySlug(current.slug, user);
+  const d = await getChallengeBySlug(current.slug, user);
   return (
     <div className="space-y-4">
       <div className="scrollbar-none flex gap-2 overflow-x-auto">

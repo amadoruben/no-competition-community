@@ -1,7 +1,8 @@
 import { MessagesSquare } from "lucide-react";
 import type { Metadata } from "next";
+import Link from "next/link";
 import { PostCard, PostRow } from "@/components/domain";
-import { Card, CardHeader, EmptyState, PageHeader, Tabs } from "@/components/ui";
+import { Card, CardHeader, EmptyState, PageHeader, Pagination, Tabs } from "@/components/ui";
 import type { PostKind } from "@/db/schema";
 import { challengePhase } from "@/lib/challenge-state";
 import { POINT_RULES } from "@/lib/points";
@@ -24,9 +25,10 @@ export default async function CommunityPage(props: PageProps<"/community">) {
   const user = await requireUser();
   const sp = await props.searchParams;
   const f = FILTERS.find((x) => x.key === sp.f) ?? FILTERS[0];
-  const feed = listFeed(user, { kind: f.kind });
-  const challenges = listChallenges(user).filter((c) => c.status !== "draft");
-  const announcements = listFeed(user, { kind: "announcement", limit: 3 });
+  const page = Number(sp.page) || 1;
+  const feed = await listFeed(user, { kind: f.kind, page });
+  const challenges = (await listChallenges(user)).filter((c) => c.status !== "draft");
+  const announcements = await listFeed(user, { kind: "announcement", limit: 3 });
 
   return (
     <div>
@@ -35,19 +37,20 @@ export default async function CommunityPage(props: PageProps<"/community">) {
         <div className="min-w-0 space-y-4">
           <Composer name={user.name} hue={user.avatarHue} canAnnounce={user.role === "investor"} challenges={challenges.map((c) => ({ id: c.id, title: c.title }))} />
           <Tabs active={f.key} items={FILTERS.map((x) => ({ key: x.key, label: x.label, href: x.key === "all" ? "/community" : `/community?f=${x.key}` }))} />
-          {feed.length === 0 ? (
+          {feed.items.length === 0 ? (
             <Card>
               <EmptyState icon={<MessagesSquare className="size-5" />} title="Ainda nada por aqui">Seja o primeiro a publicar.</EmptyState>
             </Card>
           ) : (
-            feed.map((item) => <PostCard key={item.post.id} item={item} />)
+            feed.items.map((item) => <PostCard key={item.post.id} item={item} />)
           )}
+          <Pagination page={feed.page} pages={feed.pages} href={(n) => `/community?${new URLSearchParams({ ...(f.kind ? { f: f.key } : {}), page: String(n) })}`} />
         </div>
         <aside className="space-y-4">
           <Card>
             <CardHeader title="Anúncios oficiais" />
             <div className="divide-y divide-line/70">
-              {announcements.map((a) => (
+              {announcements.items.map((a) => (
                 <PostRow key={a.post.id} item={a} />
               ))}
             </div>
@@ -59,9 +62,9 @@ export default async function CommunityPage(props: PageProps<"/community">) {
                 .filter((c) => ["open", "upcoming"].includes(challengePhase(c)))
                 .map((c) => (
                   <li key={c.id}>
-                    <a href={`/challenges/${c.slug}`} className="block px-5 py-3 text-sm font-medium hover:bg-sunken/50 hover:underline">
+                    <Link href={`/challenges/${c.slug}`} className="block px-5 py-3 text-sm font-medium hover:bg-sunken/50 hover:underline">
                       {c.title}
-                    </a>
+                    </Link>
                   </li>
                 ))}
             </ul>

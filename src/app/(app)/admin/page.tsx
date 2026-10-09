@@ -15,7 +15,7 @@ const toneClass = { volt: "bg-volt text-ink", warn: "bg-warn-soft text-warn", in
 
 export default async function AdminPage() {
   const user = await requireUser(["investor"]);
-  const o = investorOverview(user);
+  const o = await investorOverview(user);
   const kpis = [
     ["Desafios activos", o.kpis.active, "abertos, em breve ou em pausa"],
     ["Submissões recebidas", o.kpis.submissions, "em todos os desafios"],

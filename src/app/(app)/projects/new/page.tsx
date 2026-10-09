@@ -14,7 +14,7 @@ export default async function NewProject(props: PageProps<"/projects/new">) {
     <div className="mx-auto max-w-3xl">
       <PageHeader title="Novo projecto" description="A página do projecto é a sua montra perante avaliadores, investidores e a comunidade." />
       <Card className="p-5 sm:p-7">
-        <ProjectForm action={createProjectAction} categories={projectCategories()} returnTo={typeof sp.returnTo === "string" ? sp.returnTo.replace(/\/submit$/, "/submit") : undefined} />
+        <ProjectForm action={createProjectAction} categories={await projectCategories()} returnTo={typeof sp.returnTo === "string" ? sp.returnTo.replace(/\/submit$/, "/submit") : undefined} />
       </Card>
     </div>
   );

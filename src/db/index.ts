@@ -1,25 +1,80 @@
-import Database from "better-sqlite3";
-import { drizzle, type BetterSQLite3Database } from "drizzle-orm/better-sqlite3";
-import { migrate } from "drizzle-orm/better-sqlite3/migrator";
-import fs from "node:fs";
-import path from "node:path";
+import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
+import { drizzle as drizzlePostgres } from "drizzle-orm/postgres-js";
+import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
+import postgres from "postgres";
 import * as schema from "./schema";
 
-export type DB = BetterSQLite3Database<typeof schema>;
+/**
+ * One PostgreSQL database, two interchangeable drivers:
+ *
+ * - `postgres://…` (production, Supabase or any managed/self-hosted Postgres)
+ *   via postgres.js. `prepare: false` keeps it compatible with transaction-mode
+ *   poolers such as Supavisor/PgBouncer, which serverless hosts require.
+ * - `pglite://memory` or `pglite://<dir>` — embedded Postgres (WASM) for tests
+ *   and zero-setup local development. Same SQL, same migrations.
+ *
+ * Nothing outside src/db knows which one is in use.
+ */
+export type DB = PgDatabase<PgQueryResultHKT, typeof schema>;
 
-function open(): DB {
-  const file = process.env.DATABASE_PATH ?? path.join(process.cwd(), "data", "ncc.db");
-  if (file !== ":memory:") fs.mkdirSync(path.dirname(file), { recursive: true });
-  const sqlite = new Database(file);
-  sqlite.pragma("journal_mode = WAL");
-  sqlite.pragma("foreign_keys = ON");
-  sqlite.pragma("busy_timeout = 5000");
-  const db = drizzle(sqlite, { schema });
-  migrate(db, { migrationsFolder: path.join(process.cwd(), "drizzle") });
-  return db;
+export interface DbHandle {
+  db: DB;
+  driver: "postgres" | "pglite";
+  close(): Promise<void>;
 }
 
-// Reuse one connection across hot reloads in development.
-const globalForDb = globalThis as unknown as { __nccDb?: DB };
-export const db: DB = globalForDb.__nccDb ?? (globalForDb.__nccDb = open());
+export function databaseUrl() {
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error("DATABASE_URL is not set. See .env.example.");
+  return url;
+}
+
+export function openDatabase(url = databaseUrl()): DbHandle {
+  if (url.startsWith("pglite://")) {
+    // Loaded lazily so production bundles never initialise the WASM runtime.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { PGlite } = require("@electric-sql/pglite") as typeof import("@electric-sql/pglite");
+    const target = url.slice("pglite://".length);
+    const client = target === "memory" ? new PGlite() : new PGlite(target);
+    return { db: drizzlePglite(client, { schema }) as unknown as DB, driver: "pglite", close: () => client.close() };
+  }
+  const client = postgres(url, {
+    prepare: false,
+    max: Number(process.env.DATABASE_POOL_MAX ?? (process.env.VERCEL ? 1 : 10)),
+    connect_timeout: Number(process.env.DATABASE_CONNECT_TIMEOUT_S ?? 10),
+    idle_timeout: 20,
+    max_lifetime: 60 * 30,
+    connection: {
+      statement_timeout: Number(process.env.DATABASE_STATEMENT_TIMEOUT_MS ?? 15000),
+      application_name: "no-competition-community",
+    },
+    onnotice: () => {},
+  });
+  return { db: drizzlePostgres(client, { schema }) as unknown as DB, driver: "postgres", close: () => client.end({ timeout: 5 }) };
+}
+
+// One handle per process (reused across hot reloads in development).
+const g = globalThis as unknown as { __nccDb?: DbHandle };
+function handle() {
+  return (g.__nccDb ??= openDatabase());
+}
+
+/** Lazily-opened shared database. Importing this module never connects. */
+export const db: DB = new Proxy({} as DB, {
+  get(_, prop) {
+    const real = handle().db as unknown as Record<PropertyKey, unknown>;
+    const v = real[prop];
+    return typeof v === "function" ? (v as (...a: unknown[]) => unknown).bind(real) : v;
+  },
+});
+
+export function dbHandle() {
+  return handle();
+}
+
+/** Replace the shared handle (tests, scripts). */
+export function setDbHandle(h: DbHandle) {
+  g.__nccDb = h;
+}
+
 export { schema };

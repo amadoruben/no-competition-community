@@ -18,13 +18,13 @@ export default async function SubmitPage(props: PageProps<"/challenges/[slug]/su
   const sp = await props.searchParams;
   let d;
   try {
-    d = getChallengeBySlug(slug, user);
+    d = await getChallengeBySlug(slug, user);
   } catch (e) {
     if (e instanceof DomainError) notFound();
     throw e;
   }
   if (!d.canSubmit) redirect(`/challenges/${slug}`);
-  const projects = projectsForUser(user.id);
+  const projects = await projectsForUser(user.id);
   const sub = d.viewerSubmission?.s;
   const preselect = typeof sp.project === "string" ? projects.find((p) => p.slug === sp.project)?.id : undefined;
   const totalWeight = d.criteria.reduce((s, c) => s + c.weight, 0);

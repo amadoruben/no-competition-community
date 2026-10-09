@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { currentUser } from "@/server/session";
+import { currentUser, homeFor } from "@/server/session";
 import { AuthShell } from "../auth-shell";
 import { RegisterForm } from "./register-form";
 
 export const metadata: Metadata = { title: "Criar conta" };
 
 export default async function RegisterPage() {
-  if (await currentUser()) redirect("/dashboard");
+  const user = await currentUser();
+  if (user) redirect(homeFor(user));
   return (
     <AuthShell
       title="Junte-se à comunidade"

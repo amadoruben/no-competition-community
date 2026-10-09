@@ -17,13 +17,13 @@ export default async function EditChallenge(props: PageProps<"/admin/challenges/
   const { id } = await props.params;
   let d;
   try {
-    d = getChallengeForEdit(user, id);
+    d = await getChallengeForEdit(user, id);
   } catch (e) {
     if (e instanceof DomainError) notFound();
     throw e;
   }
   if (d.challenge.status === "results_published") redirect(`/admin/challenges/${id}`);
-  const locked = reviewBoard(user, id).rows.some((r) => r.evaluations.length > 0);
+  const locked = (await reviewBoard(user, id)).rows.some((r) => r.evaluations.length > 0);
   const c = d.challenge;
   return (
     <div className="mx-auto max-w-4xl">

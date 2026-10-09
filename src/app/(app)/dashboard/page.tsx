@@ -17,7 +17,7 @@ function greeting() {
 export default async function Dashboard(props: PageProps<"/dashboard">) {
   const user = await requireUser(["member"]);
   const sp = await props.searchParams;
-  const d = memberDashboard(user);
+  const d = await memberDashboard(user);
   const overall = d.points.overall;
 
   return (

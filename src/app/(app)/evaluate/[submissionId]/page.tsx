@@ -18,7 +18,7 @@ export default async function EvaluatePage(props: PageProps<"/evaluate/[submissi
   const { submissionId } = await props.params;
   let d;
   try {
-    d = getSubmissionForReview(user, submissionId);
+    d = await getSubmissionForReview(user, submissionId);
   } catch (e) {
     if (e instanceof DomainError) notFound();
     throw e;

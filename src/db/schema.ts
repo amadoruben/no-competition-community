@@ -1,13 +1,17 @@
-import { sql } from "drizzle-orm";
 import {
-  integer,
-  primaryKey,
-  real,
-  sqliteTable,
-  text,
-  uniqueIndex,
+  type AnyPgColumn,
+  boolean,
+  doublePrecision,
   index,
-} from "drizzle-orm/sqlite-core";
+  integer,
+  jsonb,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
 
 /**
  * Schema principles (adapted from Juryza, MIT):
@@ -19,43 +23,91 @@ import {
  *   investment decision are separate facts: winning never implies funding.
  */
 
-const id = () =>
-  text("id")
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID());
-const createdAt = () =>
-  integer("created_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch() * 1000)`);
+const id = () => uuid("id").primaryKey().defaultRandom();
+const ts = (name: string) => timestamp(name, { withTimezone: true, mode: "date" });
+const createdAt = () => ts("created_at").notNull().defaultNow();
 
 export const ROLES = ["member", "evaluator", "investor"] as const;
 export type Role = (typeof ROLES)[number];
 
-export const users = sqliteTable("users", {
+export const users = pgTable("users", {
   id: id(),
   email: text("email").notNull().unique(),
-  passwordHash: text("password_hash").notNull(),
+  /**
+   * Identity at the external auth provider (e.g. Supabase Auth user id).
+   * Null for accounts managed by the local provider. Keeping the mapping here
+   * means switching providers only re-links subjects; user ids never change.
+   */
+  authSubject: text("auth_subject").unique(),
   name: text("name").notNull(),
   handle: text("handle").notNull().unique(),
   role: text("role", { enum: ROLES }).notNull().default("member"),
   headline: text("headline").notNull().default(""),
   bio: text("bio").notNull().default(""),
   location: text("location").notNull().default(""),
-  skills: text("skills", { mode: "json" }).$type<string[]>().notNull().default(sql`'[]'`),
+  skills: jsonb("skills").$type<string[]>().notNull().default([]),
   websiteUrl: text("website_url"),
   linkedinUrl: text("linkedin_url"),
   githubUrl: text("github_url"),
   avatarHue: integer("avatar_hue").notNull().default(210),
-  isDemo: integer("is_demo", { mode: "boolean" }).notNull().default(false),
+  avatarFileId: uuid("avatar_file_id").references((): AnyPgColumn => files.id, { onDelete: "set null" }),
+  isDemo: boolean("is_demo").notNull().default(false),
   createdAt: createdAt(),
 });
 
-export const sessions = sqliteTable("sessions", {
-  id: text("id").primaryKey(), // sha256 of the cookie token
-  userId: text("user_id")
+// ---------------------------------------------------------------------------
+// Local auth provider tables. They are keyed by the provider "subject", not by
+// users.id, so the local provider is a self-contained identity store exactly
+// like an external one (Supabase Auth, Auth0…). Unused when AUTH_PROVIDER is
+// an external provider.
+
+export const credentials = pgTable("auth_credentials", {
+  subject: text("subject").primaryKey(),
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  updatedAt: ts("updated_at").notNull().defaultNow(),
+});
+
+export const passwordResets = pgTable("auth_password_resets", {
+  id: text("id").primaryKey(), // sha256 of the emailed token
+  subject: text("subject")
     .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+    .references(() => credentials.subject, { onDelete: "cascade" }),
+  expiresAt: ts("expires_at").notNull(),
+  usedAt: ts("used_at"),
+  createdAt: createdAt(),
+});
+
+/** Failed sign-in attempts, for throttling (local provider). */
+export const authAttempts = pgTable(
+  "auth_attempts",
+  {
+    id: id(),
+    key: text("key").notNull(), // normalised email
+    createdAt: createdAt(),
+  },
+  (t) => [index("auth_attempts_key").on(t.key, t.createdAt)],
+);
+
+/**
+ * Stored files. The database keeps a provider-neutral key; URLs are resolved
+ * at read time by the storage service, so changing provider never rewrites rows.
+ */
+export const files = pgTable("files", {
+  id: id(),
+  storageKey: text("storage_key").notNull().unique(),
+  contentType: text("content_type").notNull(),
+  size: integer("size").notNull(),
+  ownerId: uuid("owner_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: createdAt(),
+});
+
+export const sessions = pgTable("auth_sessions", {
+  id: text("id").primaryKey(), // sha256 of the cookie token
+  subject: text("subject")
+    .notNull()
+    .references(() => credentials.subject, { onDelete: "cascade" }),
+  expiresAt: ts("expires_at").notNull(),
   createdAt: createdAt(),
 });
 
@@ -68,40 +120,40 @@ export const CHALLENGE_STATUSES = [
 ] as const;
 export type ChallengeStatus = (typeof CHALLENGE_STATUSES)[number];
 
-export const challenges = sqliteTable("challenges", {
+export const challenges = pgTable("challenges", {
   id: id(),
   slug: text("slug").notNull().unique(),
   title: text("title").notNull(),
   tagline: text("tagline").notNull(),
   description: text("description").notNull(),
   category: text("category").notNull(),
-  objectives: text("objectives", { mode: "json" }).$type<string[]>().notNull().default(sql`'[]'`),
-  rules: text("rules", { mode: "json" }).$type<string[]>().notNull().default(sql`'[]'`),
+  objectives: jsonb("objectives").$type<string[]>().notNull().default([]),
+  rules: jsonb("rules").$type<string[]>().notNull().default([]),
   submissionInstructions: text("submission_instructions").notNull().default(""),
   status: text("status", { enum: CHALLENGE_STATUSES }).notNull().default("draft"),
-  startsAt: integer("starts_at", { mode: "timestamp_ms" }).notNull(),
-  submissionDeadline: integer("submission_deadline", { mode: "timestamp_ms" }).notNull(),
-  resultsDate: integer("results_date", { mode: "timestamp_ms" }).notNull(),
+  startsAt: ts("starts_at").notNull(),
+  submissionDeadline: ts("submission_deadline").notNull(),
+  resultsDate: ts("results_date").notNull(),
   maxTeamSize: integer("max_team_size").notNull().default(5),
   /** Points awarded on result publication, by final rank (index 0 = 1st). */
-  placementPoints: text("placement_points", { mode: "json" })
+  placementPoints: jsonb("placement_points")
     .$type<number[]>()
     .notNull()
-    .default(sql`'[300,200,100]'`),
+    .default([300, 200, 100]),
   /** Whether participants and their projects are visible to other members. */
-  participantsVisible: integer("participants_visible", { mode: "boolean" }).notNull().default(true),
+  participantsVisible: boolean("participants_visible").notNull().default(true),
   coverHue: integer("cover_hue").notNull().default(80),
-  createdById: text("created_by_id")
+  createdById: uuid("created_by_id")
     .notNull()
     .references(() => users.id),
-  publishedAt: integer("published_at", { mode: "timestamp_ms" }),
-  resultsPublishedAt: integer("results_published_at", { mode: "timestamp_ms" }),
+  publishedAt: ts("published_at"),
+  resultsPublishedAt: ts("results_published_at"),
   createdAt: createdAt(),
 });
 
-export const criteria = sqliteTable("criteria", {
+export const criteria = pgTable("criteria", {
   id: id(),
-  challengeId: text("challenge_id")
+  challengeId: uuid("challenge_id")
     .notNull()
     .references(() => challenges.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
@@ -113,9 +165,9 @@ export const criteria = sqliteTable("criteria", {
 export const PRIZE_KINDS = ["prize", "investment", "recognition"] as const;
 export type PrizeKind = (typeof PRIZE_KINDS)[number];
 
-export const prizes = sqliteTable("prizes", {
+export const prizes = pgTable("prizes", {
   id: id(),
-  challengeId: text("challenge_id")
+  challengeId: uuid("challenge_id")
     .notNull()
     .references(() => challenges.id, { onDelete: "cascade" }),
   /** Final rank this prize is reserved for (1 = winner). Null = discretionary. */
@@ -130,10 +182,10 @@ export const prizes = sqliteTable("prizes", {
 export const PROJECT_STAGES = ["idea", "prototype", "mvp", "traction", "scaling"] as const;
 export type ProjectStage = (typeof PROJECT_STAGES)[number];
 
-export const projects = sqliteTable("projects", {
+export const projects = pgTable("projects", {
   id: id(),
   slug: text("slug").notNull().unique(),
-  ownerId: text("owner_id")
+  ownerId: uuid("owner_id")
     .notNull()
     .references(() => users.id),
   name: text("name").notNull(),
@@ -144,22 +196,21 @@ export const projects = sqliteTable("projects", {
   category: text("category").notNull(),
   stage: text("stage", { enum: PROJECT_STAGES }).notNull().default("idea"),
   logoHue: integer("logo_hue").notNull().default(160),
+  logoFileId: uuid("logo_file_id").references(() => files.id, { onDelete: "set null" }),
   websiteUrl: text("website_url"),
   demoUrl: text("demo_url"),
   repoUrl: text("repo_url"),
   createdAt: createdAt(),
-  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch() * 1000)`),
+  updatedAt: ts("updated_at").notNull().defaultNow(),
 });
 
-export const projectMembers = sqliteTable(
+export const projectMembers = pgTable(
   "project_members",
   {
-    projectId: text("project_id")
+    projectId: uuid("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
-    userId: text("user_id")
+    userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     title: text("title").notNull().default(""),
@@ -167,12 +218,12 @@ export const projectMembers = sqliteTable(
   (t) => [primaryKey({ columns: [t.projectId, t.userId] })],
 );
 
-export const projectUpdates = sqliteTable("project_updates", {
+export const projectUpdates = pgTable("project_updates", {
   id: id(),
-  projectId: text("project_id")
+  projectId: uuid("project_id")
     .notNull()
     .references(() => projects.id, { onDelete: "cascade" }),
-  authorId: text("author_id")
+  authorId: uuid("author_id")
     .notNull()
     .references(() => users.id),
   title: text("title").notNull(),
@@ -180,17 +231,17 @@ export const projectUpdates = sqliteTable("project_updates", {
   createdAt: createdAt(),
 });
 
-export const participations = sqliteTable(
+export const participations = pgTable(
   "participations",
   {
     id: id(),
-    challengeId: text("challenge_id")
+    challengeId: uuid("challenge_id")
       .notNull()
       .references(() => challenges.id, { onDelete: "cascade" }),
-    userId: text("user_id")
+    userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    projectId: text("project_id").references(() => projects.id, { onDelete: "set null" }),
+    projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
     createdAt: createdAt(),
   },
   (t) => [uniqueIndex("participation_unique").on(t.challengeId, t.userId)],
@@ -199,17 +250,17 @@ export const participations = sqliteTable(
 export const SUBMISSION_STATUSES = ["submitted", "shortlisted", "not_selected"] as const;
 export type SubmissionStatus = (typeof SUBMISSION_STATUSES)[number];
 
-export const submissions = sqliteTable(
+export const submissions = pgTable(
   "submissions",
   {
     id: id(),
-    challengeId: text("challenge_id")
+    challengeId: uuid("challenge_id")
       .notNull()
       .references(() => challenges.id, { onDelete: "cascade" }),
-    projectId: text("project_id")
+    projectId: uuid("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
-    submittedById: text("submitted_by_id")
+    submittedById: uuid("submitted_by_id")
       .notNull()
       .references(() => users.id),
     summary: text("summary").notNull(),
@@ -218,20 +269,18 @@ export const submissions = sqliteTable(
     videoUrl: text("video_url"),
     status: text("status", { enum: SUBMISSION_STATUSES }).notNull().default("submitted"),
     submittedAt: createdAt(),
-    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
-      .notNull()
-      .default(sql`(unixepoch() * 1000)`),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
   },
   (t) => [uniqueIndex("submission_unique").on(t.challengeId, t.projectId)],
 );
 
-export const evaluatorAssignments = sqliteTable(
+export const evaluatorAssignments = pgTable(
   "evaluator_assignments",
   {
-    challengeId: text("challenge_id")
+    challengeId: uuid("challenge_id")
       .notNull()
       .references(() => challenges.id, { onDelete: "cascade" }),
-    evaluatorId: text("evaluator_id")
+    evaluatorId: uuid("evaluator_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     createdAt: createdAt(),
@@ -239,43 +288,41 @@ export const evaluatorAssignments = sqliteTable(
   (t) => [primaryKey({ columns: [t.challengeId, t.evaluatorId] })],
 );
 
-export const evaluations = sqliteTable(
+export const evaluations = pgTable(
   "evaluations",
   {
     id: id(),
-    submissionId: text("submission_id")
+    submissionId: uuid("submission_id")
       .notNull()
       .references(() => submissions.id, { onDelete: "cascade" }),
-    evaluatorId: text("evaluator_id")
+    evaluatorId: uuid("evaluator_id")
       .notNull()
       .references(() => users.id),
     /** criterionId -> score 0..10 */
-    scores: text("scores", { mode: "json" }).$type<Record<string, number>>().notNull(),
+    scores: jsonb("scores").$type<Record<string, number>>().notNull(),
     feedback: text("feedback").notNull().default(""),
     createdAt: createdAt(),
-    updatedAt: integer("updated_at", { mode: "timestamp_ms" })
-      .notNull()
-      .default(sql`(unixepoch() * 1000)`),
+    updatedAt: ts("updated_at").notNull().defaultNow(),
   },
   (t) => [uniqueIndex("evaluation_unique").on(t.submissionId, t.evaluatorId)],
 );
 
 /** Confirmed final placements for a challenge. Visible to members once published. */
-export const results = sqliteTable(
+export const results = pgTable(
   "results",
   {
     id: id(),
-    challengeId: text("challenge_id")
+    challengeId: uuid("challenge_id")
       .notNull()
       .references(() => challenges.id, { onDelete: "cascade" }),
-    submissionId: text("submission_id")
+    submissionId: uuid("submission_id")
       .notNull()
       .references(() => submissions.id, { onDelete: "cascade" }),
     rank: integer("rank").notNull(),
-    finalScore: real("final_score"),
-    prizeId: text("prize_id").references(() => prizes.id, { onDelete: "set null" }),
+    finalScore: doublePrecision("final_score"),
+    prizeId: uuid("prize_id").references(() => prizes.id, { onDelete: "set null" }),
     note: text("note").notNull().default(""),
-    decidedById: text("decided_by_id")
+    decidedById: uuid("decided_by_id")
       .notNull()
       .references(() => users.id),
     createdAt: createdAt(),
@@ -296,31 +343,29 @@ export const OPPORTUNITY_STATUSES = [
 export type OpportunityStatus = (typeof OPPORTUNITY_STATUSES)[number];
 
 /** Investment pipeline. Independent from results: a win is not a funding decision. */
-export const opportunities = sqliteTable("opportunities", {
+export const opportunities = pgTable("opportunities", {
   id: id(),
-  projectId: text("project_id")
+  projectId: uuid("project_id")
     .notNull()
     .references(() => projects.id, { onDelete: "cascade" }),
-  challengeId: text("challenge_id").references(() => challenges.id, { onDelete: "set null" }),
+  challengeId: uuid("challenge_id").references(() => challenges.id, { onDelete: "set null" }),
   status: text("status", { enum: OPPORTUNITY_STATUSES }).notNull().default("interest"),
   amount: text("amount").notNull().default(""),
   note: text("note").notNull().default(""),
-  createdById: text("created_by_id")
+  createdById: uuid("created_by_id")
     .notNull()
     .references(() => users.id),
   createdAt: createdAt(),
-  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
-    .notNull()
-    .default(sql`(unixepoch() * 1000)`),
+  updatedAt: ts("updated_at").notNull().defaultNow(),
 });
 
 /** Append-only history of decisions taken on challenges and opportunities. */
-export const decisionLog = sqliteTable(
+export const decisionLog = pgTable(
   "decision_log",
   {
     id: id(),
-    challengeId: text("challenge_id").references(() => challenges.id, { onDelete: "cascade" }),
-    actorId: text("actor_id")
+    challengeId: uuid("challenge_id").references(() => challenges.id, { onDelete: "cascade" }),
+    actorId: uuid("actor_id")
       .notNull()
       .references(() => users.id),
     action: text("action").notNull(),
@@ -333,43 +378,43 @@ export const decisionLog = sqliteTable(
 export const POST_KINDS = ["discussion", "announcement", "progress", "question"] as const;
 export type PostKind = (typeof POST_KINDS)[number];
 
-export const posts = sqliteTable(
+export const posts = pgTable(
   "posts",
   {
     id: id(),
-    authorId: text("author_id")
+    authorId: uuid("author_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     kind: text("kind", { enum: POST_KINDS }).notNull().default("discussion"),
     title: text("title").notNull(),
     body: text("body").notNull(),
-    challengeId: text("challenge_id").references(() => challenges.id, { onDelete: "set null" }),
-    projectId: text("project_id").references(() => projects.id, { onDelete: "set null" }),
-    pinned: integer("pinned", { mode: "boolean" }).notNull().default(false),
+    challengeId: uuid("challenge_id").references(() => challenges.id, { onDelete: "set null" }),
+    projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
+    pinned: boolean("pinned").notNull().default(false),
     createdAt: createdAt(),
   },
   (t) => [index("posts_created").on(t.createdAt)],
 );
 
-export const comments = sqliteTable("comments", {
+export const comments = pgTable("comments", {
   id: id(),
-  postId: text("post_id")
+  postId: uuid("post_id")
     .notNull()
     .references(() => posts.id, { onDelete: "cascade" }),
-  authorId: text("author_id")
+  authorId: uuid("author_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   body: text("body").notNull(),
   createdAt: createdAt(),
 });
 
-export const reactions = sqliteTable(
+export const reactions = pgTable(
   "reactions",
   {
-    postId: text("post_id")
+    postId: uuid("post_id")
       .notNull()
       .references(() => posts.id, { onDelete: "cascade" }),
-    userId: text("user_id")
+    userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     createdAt: createdAt(),
@@ -377,7 +422,7 @@ export const reactions = sqliteTable(
   (t) => [primaryKey({ columns: [t.postId, t.userId] })],
 );
 
-export const courses = sqliteTable("courses", {
+export const courses = pgTable("courses", {
   id: id(),
   slug: text("slug").notNull().unique(),
   title: text("title").notNull(),
@@ -387,18 +432,18 @@ export const courses = sqliteTable("courses", {
   position: integer("position").notNull().default(0),
 });
 
-export const modules = sqliteTable("modules", {
+export const modules = pgTable("modules", {
   id: id(),
-  courseId: text("course_id")
+  courseId: uuid("course_id")
     .notNull()
     .references(() => courses.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   position: integer("position").notNull().default(0),
 });
 
-export const lessons = sqliteTable("lessons", {
+export const lessons = pgTable("lessons", {
   id: id(),
-  moduleId: text("module_id")
+  moduleId: uuid("module_id")
     .notNull()
     .references(() => modules.id, { onDelete: "cascade" }),
   slug: text("slug").notNull(),
@@ -408,13 +453,13 @@ export const lessons = sqliteTable("lessons", {
   position: integer("position").notNull().default(0),
 });
 
-export const lessonProgress = sqliteTable(
+export const lessonProgress = pgTable(
   "lesson_progress",
   {
-    userId: text("user_id")
+    userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    lessonId: text("lesson_id")
+    lessonId: uuid("lesson_id")
       .notNull()
       .references(() => lessons.id, { onDelete: "cascade" }),
     completedAt: createdAt(),
@@ -432,3 +477,4 @@ export type Evaluation = typeof evaluations.$inferSelect;
 export type Result = typeof results.$inferSelect;
 export type Opportunity = typeof opportunities.$inferSelect;
 export type Post = typeof posts.$inferSelect;
+export type StoredFile = typeof files.$inferSelect;

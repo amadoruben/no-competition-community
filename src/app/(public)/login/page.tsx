@@ -3,7 +3,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { demoLoginAction } from "@/app/actions";
-import { currentUser } from "@/server/session";
+import { demoMode } from "@/server/config";
+import { currentUser, homeFor } from "@/server/session";
+import { Notice } from "@/components/ui";
 import { AuthShell } from "../auth-shell";
 import { LoginForm } from "./login-form";
 
@@ -16,20 +18,30 @@ const demos = [
 ];
 
 export default async function LoginPage(props: PageProps<"/login">) {
-  if (await currentUser()) redirect("/dashboard");
+  const user = await currentUser();
+  if (user) redirect(homeFor(user));
   const sp = await props.searchParams;
+  const demo = demoMode();
   return (
     <AuthShell
       title="Bem-vindo de volta"
       subtitle="Entre na sua conta ou explore com uma conta de demonstração."
       aside={
+        demo ? (
         <>
           <p className="text-[13px] font-semibold tracking-wide text-volt uppercase">Demonstração</p>
           <h2 className="mt-3 font-display text-4xl leading-tight font-semibold">Veja a plataforma de cada lado da mesa.</h2>
           <p className="mt-4 max-w-md text-white/70">As contas de demonstração usam dados fictícios. Pode criar, submeter e publicar à vontade — repõe-se com <code className="rounded bg-white/10 px-1.5 py-0.5 text-[13px]">npm run db:seed</code>.</p>
         </>
+        ) : (
+          <h2 className="font-display text-4xl leading-tight font-semibold">Desafios reais. Critérios públicos. Decisões registadas.</h2>
+        )
       }
     >
+      {sp.confirm && <Notice tone="ok" className="mb-6">Conta criada. Confirme o seu email para entrar.</Notice>}
+      {sp.error === "demo" && <Notice tone="bad" className="mb-6">Não foi possível entrar com a conta de demonstração. Tente novamente.</Notice>}
+      {demo && (
+      <>
       <div className="space-y-2">
         <p className="text-[13px] font-medium text-muted">Entrar com um clique</p>
         {demos.map(({ email, icon: Icon, title, who, body }) => (
@@ -52,7 +64,14 @@ export default async function LoginPage(props: PageProps<"/login">) {
       <div className="my-8 flex items-center gap-3 text-[12px] text-faint">
         <span className="h-px flex-1 bg-line" /> ou com email <span className="h-px flex-1 bg-line" />
       </div>
+      </>
+      )}
       <LoginForm next={typeof sp.next === "string" ? sp.next : undefined} />
+      <p className="mt-4 text-center text-sm">
+        <Link href="/forgot-password" className="text-muted underline-offset-4 hover:text-ink hover:underline">
+          Esqueceu-se da palavra-passe?
+        </Link>
+      </p>
       <p className="mt-6 text-center text-sm text-muted">
         Ainda não tem conta?{" "}
         <Link href="/register" className="font-medium text-ink underline underline-offset-4">

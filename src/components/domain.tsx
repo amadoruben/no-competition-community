@@ -76,14 +76,14 @@ export function ProjectCard({
   p,
   meta,
 }: {
-  p: Pick<Project, "slug" | "name" | "tagline" | "logoHue" | "stage" | "category">;
+  p: Pick<Project, "slug" | "name" | "tagline" | "logoHue" | "logoFileId" | "stage" | "category">;
   meta?: React.ReactNode;
 }) {
   return (
     <Link href={`/projects/${p.slug}`} className="group block">
       <Card className="flex h-full flex-col p-4 transition-shadow group-hover:shadow-[var(--shadow-pop)]">
         <div className="flex items-start gap-3">
-          <ProjectLogo name={p.name} hue={p.logoHue} />
+          <ProjectLogo name={p.name} hue={p.logoHue} fileId={p.logoFileId} />
           <div className="min-w-0">
             <h3 className="truncate font-semibold group-hover:underline">{p.name}</h3>
             <div className="mt-0.5 text-[12px] text-muted">{p.category}</div>
@@ -103,18 +103,20 @@ export function PersonLine({
   name,
   handle,
   hue,
+  fileId,
   sub,
   size = 36,
 }: {
   name: string;
   handle: string;
   hue: number;
+  fileId?: string | null;
   sub?: React.ReactNode;
   size?: number;
 }) {
   return (
     <Link href={`/members/${handle}`} className="group flex min-w-0 items-center gap-3">
-      <Avatar name={name} hue={hue} size={size} />
+      <Avatar name={name} hue={hue} fileId={fileId} size={size} />
       <div className="min-w-0">
         <div className="truncate text-sm font-medium group-hover:underline">{name}</div>
         {sub && <div className="truncate text-[12px] text-muted">{sub}</div>}

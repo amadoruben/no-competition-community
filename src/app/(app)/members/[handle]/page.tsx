@@ -13,7 +13,7 @@ import { requireUser } from "@/server/session";
 
 export async function generateMetadata(props: PageProps<"/members/[handle]">): Promise<Metadata> {
   try {
-    return { title: getMember((await props.params).handle).user.name };
+    return { title: (await getMember((await props.params).handle)).user.name };
   } catch {
     return {};
   }
@@ -23,13 +23,13 @@ export default async function MemberPage(props: PageProps<"/members/[handle]">) 
   const viewer = await requireUser();
   let d;
   try {
-    d = getMember((await props.params).handle);
+    d = await getMember((await props.params).handle);
   } catch (e) {
     if (e instanceof DomainError) notFound();
     throw e;
   }
   const u = d.user;
-  const pts = u.role === "member" ? memberPoints(u.id) : null;
+  const pts = u.role === "member" ? await memberPoints(u.id) : null;
   const links = [
     [u.websiteUrl, "Website"],
     [u.linkedinUrl, "LinkedIn"],
@@ -40,7 +40,7 @@ export default async function MemberPage(props: PageProps<"/members/[handle]">) 
     <div className="space-y-6">
       <Card className="p-5 sm:p-8">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
-          <Avatar name={u.name} hue={u.avatarHue} size={88} />
+          <Avatar name={u.name} hue={u.avatarHue} fileId={u.avatarFileId} size={88} />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="font-display text-[28px] leading-tight font-semibold">{u.name}</h1>

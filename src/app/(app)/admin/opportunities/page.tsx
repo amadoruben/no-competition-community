@@ -5,7 +5,7 @@ import { Card, CardHeader, cx, Notice, PageHeader, ProjectLogo } from "@/compone
 import { OPPORTUNITY_STATUSES } from "@/db/schema";
 import { timeAgo } from "@/lib/format";
 import { listChallenges } from "@/server/challenges";
-import { listProjects } from "@/server/projects";
+import { projectOptions } from "@/server/projects";
 import { listOpportunities, OPPORTUNITY_LABEL } from "@/server/review";
 import { requireUser } from "@/server/session";
 import { OpportunityForm } from "./opportunity-form";
@@ -15,9 +15,9 @@ export const metadata: Metadata = { title: "Pipeline de investimento" };
 export default async function OpportunitiesPage(props: PageProps<"/admin/opportunities">) {
   const user = await requireUser(["investor"]);
   const sp = await props.searchParams;
-  const opps = listOpportunities(user);
-  const projects = listProjects().map((r) => ({ id: r.p.id, name: r.p.name }));
-  const challenges = listChallenges(user).map((c) => ({ id: c.id, title: c.title }));
+  const opps = await listOpportunities(user);
+  const projects = await projectOptions();
+  const challenges = (await listChallenges(user)).map((c) => ({ id: c.id, title: c.title }));
   const editing = typeof sp.edit === "string" ? opps.find((o) => o.o.id === sp.edit) : undefined;
   const preProject = typeof sp.project === "string" ? sp.project : undefined;
 
@@ -40,7 +40,7 @@ export default async function OpportunitiesPage(props: PageProps<"/admin/opportu
                   {col.map((o) => (
                     <Link key={o.o.id} href={`/admin/opportunities?edit=${o.o.id}`} scroll={false} className={cx("block rounded-xl bg-surface p-3 ring-1 transition-shadow hover:shadow-[var(--shadow-card)]", editing?.o.id === o.o.id ? "ring-ink" : "ring-line")}>
                       <div className="flex items-center gap-2">
-                        <ProjectLogo name={o.projectName} hue={o.projectLogoHue} size={26} />
+                        <ProjectLogo name={o.projectName} hue={o.projectLogoHue} fileId={o.projectLogoFileId} size={26} />
                         <span className="truncate text-sm font-semibold">{o.projectName}</span>
                       </div>
                       <div className="mt-2 font-display text-lg font-semibold">{o.o.amount || "—"}</div>

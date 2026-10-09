@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { updateProjectAction } from "@/app/actions";
+import { projectLogoAction, updateProjectAction } from "@/app/actions";
+import { ImageUpload } from "@/components/image-upload";
 import { ProjectForm } from "@/components/project-form";
 import { Card, PageHeader } from "@/components/ui";
 import { DomainError } from "@/server/errors";
@@ -15,7 +16,7 @@ export default async function EditProject(props: PageProps<"/projects/[slug]/edi
   const { slug } = await props.params;
   let d;
   try {
-    d = getProjectBySlug(slug, user);
+    d = await getProjectBySlug(slug, user);
   } catch (e) {
     if (e instanceof DomainError) notFound();
     throw e;
@@ -25,11 +26,15 @@ export default async function EditProject(props: PageProps<"/projects/[slug]/edi
     <div className="mx-auto max-w-3xl space-y-6">
       <PageHeader title={`Editar ${d.project.name}`} />
       <Card className="p-5 sm:p-7">
-        <ProjectForm action={updateProjectAction.bind(null, d.project.id)} project={d.project} categories={projectCategories()} />
+        <h2 className="mb-4 font-display text-lg font-semibold">Logótipo</h2>
+        <ImageUpload action={projectLogoAction.bind(null, d.project.id)} name={d.project.name} hue={d.project.logoHue} fileId={d.project.logoFileId} shape="logo" label="Carregar logótipo" />
+      </Card>
+      <Card className="p-5 sm:p-7">
+        <ProjectForm action={updateProjectAction.bind(null, d.project.id)} project={d.project} categories={await projectCategories()} />
       </Card>
       {d.isOwner && (
         <Card className="p-5 sm:p-7">
-          <TeamManager projectId={d.project.id} team={d.team.map((t) => ({ name: t.name, handle: t.handle, title: t.title, hue: t.avatarHue }))} />
+          <TeamManager projectId={d.project.id} projectOwnerId={d.project.ownerId} team={d.team.map((t) => ({ id: t.id, name: t.name, handle: t.handle, title: t.title, hue: t.avatarHue, fileId: t.avatarFileId }))} />
         </Card>
       )}
     </div>
