@@ -1,14 +1,19 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
+import { configIssues } from "./config";
 
 export interface HealthReport {
   status: "ok" | "degraded";
   version: string;
-  checks: { database: { ok: boolean; latencyMs?: number; error?: string; migrations?: number } };
+  checks: {
+    config: { ok: boolean; issues?: string[] };
+    database: { ok: boolean; latencyMs?: number; error?: string; migrations?: number };
+  };
 }
 
 /** Bounded-time readiness check. Never throws; never leaks connection details. */
 export async function healthReport(timeoutMs = 3000): Promise<HealthReport> {
+  const issues = configIssues();
   const started = Date.now();
   let database: HealthReport["checks"]["database"];
   try {
@@ -27,8 +32,9 @@ export async function healthReport(timeoutMs = 3000): Promise<HealthReport> {
     database = { ok: false, error: e instanceof Error && e.message === "timeout" ? "timeout" : "unreachable" };
   }
   return {
-    status: database.ok ? "ok" : "degraded",
+    status: database.ok && !issues.length ? "ok" : "degraded",
     version: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? process.env.APP_VERSION ?? "dev",
-    checks: { database },
+    // Variable names only — never values.
+    checks: { config: issues.length ? { ok: false, issues } : { ok: true }, database },
   };
 }

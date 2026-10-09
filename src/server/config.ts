@@ -34,6 +34,12 @@ const schema = z
 export type Config = z.infer<typeof schema>;
 let cached: Config | undefined;
 
+/** Problems with the current configuration, as "VARIABLE: reason" (never values). */
+export function configIssues(): string[] {
+  const r = schema.safeParse(process.env);
+  return r.success ? [] : r.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`);
+}
+
 export function config(): Config {
   if (cached) return cached;
   const r = schema.safeParse(process.env);
@@ -44,8 +50,12 @@ export function config(): Config {
   return (cached = r.data);
 }
 
-/** Demo shortcuts (one-click demo login) are on by default only outside production. */
+/**
+ * Demo shortcuts (one-click demo login). Off in production unless explicitly
+ * enabled; read directly so a misconfigured deployment can still render pages.
+ */
 export function demoMode() {
-  const c = config();
-  return c.DEMO_MODE ? c.DEMO_MODE === "1" : c.APP_ENV !== "production";
+  const flag = process.env.DEMO_MODE;
+  if (flag === "1" || flag === "0") return flag === "1";
+  return (process.env.APP_ENV ?? "development") !== "production";
 }

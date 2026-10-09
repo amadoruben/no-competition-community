@@ -50,13 +50,23 @@ export class SupabaseAuthProvider implements AuthProvider {
     return { subject: data.user.id, email: data.user.email! };
   }
 
-  async signUp(email: string, password: string) {
-    const { data, error } = await (await this.client()).auth.signUp({ email, password });
+  async signUp(email: string, password: string, opts?: { confirmRedirect?: string }) {
+    const { data, error } = await (await this.client()).auth.signUp({
+      email,
+      password,
+      options: opts?.confirmRedirect ? { emailRedirectTo: opts.confirmRedirect } : undefined,
+    });
     if (error || !data.user) {
       if (error?.code === "user_already_exists") throw new AuthError("Já existe uma conta com este email.", "exists");
       throw new AuthError(error?.message ?? "Não foi possível criar a conta.");
     }
     return { identity: { subject: data.user.id, email: data.user.email! }, needsEmailConfirmation: !data.session };
+  }
+
+  async exchangeCallback(code: string): Promise<AuthIdentity> {
+    const { data, error } = await (await this.client()).auth.exchangeCodeForSession(code);
+    if (error || !data.user) throw new AuthError("O link expirou ou já foi utilizado.");
+    return { subject: data.user.id, email: data.user.email! };
   }
 
   async currentIdentity(): Promise<AuthIdentity | null> {

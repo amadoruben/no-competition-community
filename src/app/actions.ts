@@ -108,7 +108,7 @@ export async function registerAction(_: ActionState, fd: FormData): Promise<Acti
   let dest = "/dashboard?welcome=1";
   const r = await attempt(async () => {
     const v = await validateRegistration({ name: str(fd, "name"), email: str(fd, "email"), password: str(fd, "password") });
-    const { identity, needsEmailConfirmation } = await auth().signUp(v.email, v.password);
+    const { identity, needsEmailConfirmation } = await auth().signUp(v.email, v.password, { confirmRedirect: `${await origin()}/auth/callback` });
     await resolveUser(identity, v.name);
     if (needsEmailConfirmation) dest = "/login?confirm=1";
   });

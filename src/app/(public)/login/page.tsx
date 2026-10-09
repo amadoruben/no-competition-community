@@ -39,6 +39,7 @@ export default async function LoginPage(props: PageProps<"/login">) {
       }
     >
       {sp.confirm && <Notice tone="ok" className="mb-6">Conta criada. Confirme o seu email para entrar.</Notice>}
+      {sp.error === "link" && <Notice tone="bad" className="mb-6">O link expirou ou já foi utilizado. Entre com a sua palavra-passe ou peça um novo link.</Notice>}
       {sp.error === "demo" && <Notice tone="bad" className="mb-6">Não foi possível entrar com a conta de demonstração. Tente novamente.</Notice>}
       {demo && (
       <>
