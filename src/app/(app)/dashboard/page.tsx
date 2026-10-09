@@ -69,7 +69,7 @@ export default async function Dashboard(props: PageProps<"/dashboard">) {
                         <span className="block truncate text-sm font-medium">{t.title}</span>
                         <span className={cx("block text-[13px]", t.urgent ? "text-warn" : "text-muted")}>{t.detail}</span>
                       </span>
-                      <ArrowRight className="size-4 text-faint transition-transform group-hover:translate-x-0.5 group-hover:text-ink" />
+                      <ArrowRight className="size-4 text-muted transition-transform group-hover:translate-x-0.5 group-hover:text-ink" />
                     </Link>
                   </li>
                 ))}
@@ -172,7 +172,7 @@ export default async function Dashboard(props: PageProps<"/dashboard">) {
                   <li key={i} className="flex items-center gap-3 px-5 py-2.5 text-sm">
                     <span className={cx("tabular w-12 font-semibold", e.kind === "merit" ? "text-ok" : "text-ink")}>+{e.points}</span>
                     <span className="min-w-0 flex-1 truncate text-ink-2">{e.reason}</span>
-                    <span className="text-[12px] whitespace-nowrap text-faint">{timeAgo(e.at)}</span>
+                    <span className="text-[12px] whitespace-nowrap text-muted">{timeAgo(e.at)}</span>
                   </li>
                 ))}
               </ul>

@@ -158,7 +158,7 @@ export default async function Landing() {
           Entrar na demonstração <ArrowRight className="size-4" />
         </ButtonLink>
       </section>
-      <footer className="border-t border-line py-8 text-center text-[12px] text-faint">
+      <footer className="border-t border-line py-8 text-center text-[12px] text-muted">
         © No Competition Community · Os dados apresentados são fictícios, para demonstração.
       </footer>
     </div>

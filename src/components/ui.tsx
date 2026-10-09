@@ -271,7 +271,7 @@ export function Breadcrumbs({ items }: { items: { label: string; href?: string }
       <ol className="flex flex-wrap items-center gap-1.5 text-muted">
         {items.map((it, i) => (
           <li key={i} className="flex items-center gap-1.5">
-            {i > 0 && <span aria-hidden className="text-faint">/</span>}
+            {i > 0 && <span aria-hidden className="text-muted">/</span>}
             {it.href ? (
               <Link href={it.href} className="hover:text-ink hover:underline">
                 {it.label}
@@ -297,18 +297,18 @@ export function Pagination({ page, pages, href, total, label = "resultados" }: {
     <nav aria-label="Paginação" className="mt-6 flex flex-col items-center gap-2">
       <ul className="flex items-center gap-1">
         <li>
-          {page > 1 ? <Link href={href(page - 1)} className={clsx(cell, "hover:bg-sunken")} aria-label="Página anterior">‹</Link> : <span className={clsx(cell, "text-faint")}>‹</span>}
+          {page > 1 ? <Link href={href(page - 1)} className={clsx(cell, "hover:bg-sunken")} aria-label="Página anterior">‹</Link> : <span className={clsx(cell, "text-muted")}>‹</span>}
         </li>
         {nums.map((n, i) => (
           <li key={n} className="flex items-center gap-1">
-            {i > 0 && n - nums[i - 1] > 1 && <span className="px-1 text-faint">…</span>}
+            {i > 0 && n - nums[i - 1] > 1 && <span className="px-1 text-muted">…</span>}
             <Link href={href(n)} aria-current={n === page ? "page" : undefined} className={clsx(cell, "tabular", n === page ? "bg-ink text-white" : "hover:bg-sunken")}>
               {n}
             </Link>
           </li>
         ))}
         <li>
-          {page < pages ? <Link href={href(page + 1)} className={clsx(cell, "hover:bg-sunken")} aria-label="Página seguinte">›</Link> : <span className={clsx(cell, "text-faint")}>›</span>}
+          {page < pages ? <Link href={href(page + 1)} className={clsx(cell, "hover:bg-sunken")} aria-label="Página seguinte">›</Link> : <span className={clsx(cell, "text-muted")}>›</span>}
         </li>
       </ul>
       {total !== undefined && <p className="text-[13px] text-muted">{total} {label}</p>}
@@ -353,7 +353,7 @@ export function SearchBox({ name = "q", defaultValue, placeholder, label, hidden
         defaultValue={defaultValue}
         placeholder={placeholder}
         aria-label={label}
-        className="h-10 w-full rounded-full bg-surface pr-3 pl-9 text-sm ring-1 ring-line-strong ring-inset placeholder:text-faint focus:ring-2 focus:ring-ink focus:outline-none"
+        className="h-10 w-full rounded-full bg-surface pr-3 pl-9 text-sm ring-1 ring-line-strong ring-inset placeholder:text-muted focus:ring-2 focus:ring-ink focus:outline-none"
       />
     </form>
   );
@@ -377,5 +377,71 @@ export function StatePanel({ icon, title, children, action, tone = "neutral" }: 
       {children && <div className="mt-2 text-[15px] text-ink-2">{children}</div>}
       {action && <div className="mt-6 flex flex-wrap justify-center gap-2">{action}</div>}
     </div>
+  );
+}
+
+// Data display -------------------------------------------------------------------
+
+/**
+ * Horizontal bar list — one series, magnitude only. One hue (ink), values as
+ * text (never colour alone), fixed scale when `max` is given so charts are
+ * comparable. Exposed to assistive tech as a list with full labels.
+ */
+export function BarList({
+  items,
+  max,
+  format = (v) => String(v),
+  label,
+}: {
+  items: { key: string; label: ReactNode; value: number | null; hint?: ReactNode; href?: string }[];
+  max?: number;
+  format?: (v: number) => string;
+  label: string;
+}) {
+  const top = max ?? Math.max(1, ...items.map((i) => i.value ?? 0));
+  return (
+    <ul aria-label={label} className="space-y-3">
+      {items.map((it) => {
+        const pct = it.value === null ? 0 : Math.max(0, Math.min(100, (it.value / top) * 100));
+        const text = it.value === null ? "—" : format(it.value);
+        const row = (
+          <>
+            <div className="flex items-baseline justify-between gap-3 text-sm">
+              <span className="min-w-0 truncate text-ink">{it.label}</span>
+              <span className="tabular shrink-0 font-mono font-semibold text-ink">{text}</span>
+            </div>
+            <div className="mt-1.5 h-2 rounded-full bg-sunken" title={`${typeof it.label === "string" ? it.label + ": " : ""}${text}`}>
+              {it.value !== null && <div className="h-full rounded-full bg-ink transition-[width]" style={{ width: `${Math.max(pct, 1.5)}%` }} />}
+            </div>
+            {it.hint && <div className="mt-1 text-[12px] text-muted">{it.hint}</div>}
+          </>
+        );
+        return (
+          <li key={it.key}>
+            {it.href ? (
+              <Link href={it.href} className="block rounded-lg outline-offset-4 hover:[&_.bg-ink]:bg-ink-2">
+                {row}
+              </Link>
+            ) : (
+              row
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** Table header cell that links to a sorted view (server-side sorting via URL). */
+export function SortHeader({ label, sortKey, current, dir, href, align = "left" }: { label: string; sortKey: string; current: string; dir: "asc" | "desc"; href: (key: string, dir: "asc" | "desc") => string; align?: "left" | "right" }) {
+  const active = current === sortKey;
+  const next = active && dir === "desc" ? "asc" : "desc";
+  return (
+    <th scope="col" aria-sort={active ? (dir === "asc" ? "ascending" : "descending") : "none"} className={clsx("px-4 py-2.5 font-medium", align === "right" && "text-right")}>
+      <Link href={href(sortKey, next)} scroll={false} className={clsx("inline-flex items-center gap-1 hover:text-ink", active && "text-ink")}>
+        {label}
+        <span aria-hidden className={clsx("text-[10px]", !active && "opacity-0")}>{dir === "asc" ? "▲" : "▼"}</span>
+      </Link>
+    </th>
   );
 }

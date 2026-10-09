@@ -46,7 +46,7 @@ export default async function OpportunitiesPage(props: PageProps<"/admin/opportu
                       <div className="mt-2 font-display text-lg font-semibold">{o.o.amount || "—"}</div>
                       {o.challengeTitle && <div className="truncate text-[12px] text-muted">via {o.challengeTitle}</div>}
                       {o.o.note && <p className="mt-1.5 line-clamp-3 text-[12px] text-ink-2">{o.o.note}</p>}
-                      <div className="mt-2 text-[11px] text-faint">Actualizado {timeAgo(o.o.updatedAt)}</div>
+                      <div className="mt-2 text-[11px] text-muted">Actualizado {timeAgo(o.o.updatedAt)}</div>
                     </Link>
                   ))}
                 </div>

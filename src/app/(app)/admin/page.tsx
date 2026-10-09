@@ -2,7 +2,7 @@ import { ArrowRight, Plus } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ChallengeCover, PhaseBadge } from "@/components/domain";
-import { Badge, ButtonLink, Card, CardHeader, cx, EmptyState, PageHeader, Progress } from "@/components/ui";
+import { Badge, BarList, ButtonLink, Card, CardHeader, cx, EmptyState, PageHeader, Progress } from "@/components/ui";
 import { fmtDay, timeAgo } from "@/lib/format";
 import { OPPORTUNITY_TONE } from "@/lib/labels";
 import { investorOverview } from "@/server/admin";
@@ -88,6 +88,17 @@ export default async function AdminPage() {
 
         <aside className="space-y-4">
           <Card>
+            <CardHeader title="Submissões por desafio" subtitle="Desafios publicados; inscritos indicados por baixo" />
+            <div className="p-5">
+              <BarList
+                label="Submissões por desafio"
+                items={o.rows
+                  .filter((r) => r.status !== "draft")
+                  .map((r) => ({ key: r.id, label: r.title, value: r.submissions, hint: `${r.participants} inscritos`, href: `/admin/challenges/${r.id}?tab=submissions` }))}
+              />
+            </div>
+          </Card>
+          <Card>
             <CardHeader title="Pipeline de investimento" action={<ButtonLink href="/admin/opportunities" variant="ghost" size="sm">Abrir</ButtonLink>} />
             {o.opportunities.length === 0 ? (
               <p className="p-5 text-sm text-muted">Sem oportunidades registadas.</p>
@@ -111,7 +122,7 @@ export default async function AdminPage() {
               {o.history.map((h) => (
                 <li key={h.id} className="px-5 py-3">
                   <p className="text-[13px] text-ink-2">{h.summary}</p>
-                  <p className="mt-0.5 text-[12px] text-faint">{h.actorName} · {timeAgo(h.createdAt)}</p>
+                  <p className="mt-0.5 text-[12px] text-muted">{h.actorName} · {timeAgo(h.createdAt)}</p>
                 </li>
               ))}
             </ol>

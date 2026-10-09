@@ -61,7 +61,7 @@ export default async function LoginPage(props: PageProps<"/login">) {
           </form>
         ))}
       </div>
-      <div className="my-8 flex items-center gap-3 text-[12px] text-faint">
+      <div className="my-8 flex items-center gap-3 text-[12px] text-muted">
         <span className="h-px flex-1 bg-line" /> ou com email <span className="h-px flex-1 bg-line" />
       </div>
       </>

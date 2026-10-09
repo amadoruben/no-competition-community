@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PhaseBadge, RankMedal, RoleTag, ScorePill } from "@/components/domain";
-import { Avatar, Badge, Breadcrumbs, ButtonLink, Card, CardHeader, cx, EmptyState, Notice, ProjectLogo, Tabs } from "@/components/ui";
+import { Avatar, Badge, BarList, Breadcrumbs, ButtonLink, SortHeader, Card, CardHeader, cx, EmptyState, Notice, ProjectLogo, Tabs } from "@/components/ui";
 import { challengePhase, STATUS_LABEL } from "@/lib/challenge-state";
 import { fmtDate, fmtDateTime, fmtScore } from "@/lib/format";
 import { STAGE_LABEL, SUBMISSION_STATUS_LABEL, SUBMISSION_STATUS_TONE } from "@/lib/labels";
@@ -37,6 +37,17 @@ export default async function ManageChallenge(props: PageProps<"/admin/challenge
   const evaluatorTotal = b.evaluators.length;
   const evalDone = b.rows.reduce((s, r) => s + r.evaluations.length, 0);
   const evalExpected = b.rows.length * evaluatorTotal;
+  const sortKey = typeof sp.sort === "string" && ["score", "date", "name", "evals"].includes(sp.sort) ? sp.sort : "score";
+  const sortDir: "asc" | "desc" = sp.dir === "asc" ? "asc" : "desc";
+  const sortedRows = [...b.rows].sort((x, y) => {
+    const v =
+      sortKey === "name" ? x.project.name.localeCompare(y.project.name, "pt") :
+      sortKey === "date" ? +x.submission.submittedAt - +y.submission.submittedAt :
+      sortKey === "evals" ? x.evaluationCount - y.evaluationCount :
+      (x.score ?? -1) - (y.score ?? -1);
+    return sortDir === "asc" ? v : -v;
+  });
+  const sortHref = (k: string, d: "asc" | "desc") => `/admin/challenges/${id}?tab=submissions&sort=${k}&dir=${d}`;
   const compareIds = typeof sp.ids === "string" ? sp.ids.split(",") : b.rows.filter((r) => r.rank !== null).slice(0, 4).map((r) => r.submission.id);
 
   const tabs = [
@@ -111,7 +122,7 @@ export default async function ManageChallenge(props: PageProps<"/admin/challenge
                 {b.rows.slice(0, 6).map((r) => (
                   <li key={r.submission.id}>
                     <Link href={`/evaluate/${r.submission.id}`} className="flex items-center gap-3 px-5 py-3 hover:bg-sunken/40">
-                      {r.rank ? <RankMedal rank={r.rank} /> : <span className="w-8 text-center text-faint">—</span>}
+                      {r.rank ? <RankMedal rank={r.rank} /> : <span className="w-8 text-center text-muted">—</span>}
                       <ProjectLogo name={r.project.name} hue={r.project.logoHue} fileId={r.project.logoFileId} size={34} />
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-medium">{r.project.name}</div>
@@ -125,6 +136,21 @@ export default async function ManageChallenge(props: PageProps<"/admin/challenge
             )}
           </Card>
           <div className="space-y-4">
+            <Card>
+              <CardHeader title="Funil do desafio" subtitle="Da inscrição à classificação" />
+              <div className="p-5">
+                <BarList
+                  label="Funil do desafio"
+                  max={Math.max(1, detail.participantCount)}
+                  items={[
+                    { key: "enrolled", label: "Inscritos", value: detail.participantCount },
+                    { key: "submitted", label: "Submissões", value: b.rows.length },
+                    { key: "scored", label: "Com avaliação completa", value: b.rows.filter((r) => r.evaluationCount > 0).length },
+                    { key: "ranked", label: "Classificados", value: b.confirmed.length },
+                  ]}
+                />
+              </div>
+            </Card>
             <Card>
               <CardHeader title="Critérios" />
               <ul className="divide-y divide-line/70">
@@ -153,19 +179,19 @@ export default async function ManageChallenge(props: PageProps<"/admin/challenge
               <table className="w-full min-w-[760px] text-sm">
                 <thead className="bg-sunken/50 text-left text-[12px] text-muted">
                   <tr>
-                    <th className="px-4 py-2.5 font-medium">#</th>
-                    <th className="px-4 py-2.5 font-medium">Projecto</th>
-                    <th className="px-4 py-2.5 font-medium">Submetido</th>
-                    <th className="px-4 py-2.5 font-medium">Avaliações</th>
-                    <th className="px-4 py-2.5 text-right font-medium">Nota</th>
+                    <th scope="col" className="px-4 py-2.5 font-medium">#</th>
+                    <SortHeader label="Projecto" sortKey="name" current={sortKey} dir={sortDir} href={sortHref} />
+                    <SortHeader label="Submetido" sortKey="date" current={sortKey} dir={sortDir} href={sortHref} />
+                    <SortHeader label="Avaliações" sortKey="evals" current={sortKey} dir={sortDir} href={sortHref} />
+                    <SortHeader label="Nota" sortKey="score" current={sortKey} dir={sortDir} href={sortHref} align="right" />
                     <th className="px-4 py-2.5 font-medium">Estado</th>
                     <th className="px-4 py-2.5" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line/60">
-                  {b.rows.map((r) => (
+                  {sortedRows.map((r) => (
                     <tr key={r.submission.id} className="hover:bg-sunken/30">
-                      <td className="px-4 py-3">{r.rank ? <RankMedal rank={r.rank} /> : <span className="text-faint">—</span>}</td>
+                      <td className="px-4 py-3">{r.rank ? <RankMedal rank={r.rank} /> : <span className="text-muted">—</span>}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2.5">
                           <ProjectLogo name={r.project.name} hue={r.project.logoHue} fileId={r.project.logoFileId} size={32} />
@@ -364,7 +390,7 @@ function Compare({ board, ids, challengeId }: { board: ReviewBoard; ids: string[
                       return (
                         <td key={r.submission.id} className="px-4 py-3">
                           {v === undefined ? (
-                            <span className="text-faint">—</span>
+                            <span className="text-muted">—</span>
                           ) : (
                             <div className="flex items-center gap-2">
                               <div className="h-2 w-20 overflow-hidden rounded-full bg-sunken">

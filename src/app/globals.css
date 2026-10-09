@@ -19,8 +19,8 @@
 
   --color-ink: #101216;
   --color-ink-2: #383d45;
-  --color-muted: #686d76;
-  --color-faint: #9a9ea6;
+  --color-muted: #62666e; /* ≥4.9:1 on paper, surface and sunken (WCAG AA text) */
+  --color-faint: #868a92; /* decorative only: icons, rules (≥3:1 on surface); never body text */
 
   --color-volt: #d4f24a;
   --color-volt-strong: #b9dc1d;

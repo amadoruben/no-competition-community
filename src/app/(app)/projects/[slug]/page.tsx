@@ -59,7 +59,7 @@ export default async function ProjectPage(props: PageProps<"/projects/[slug]">) 
             <div className="flex flex-wrap gap-2">
               {links.map(({ href, label, icon: Icon }) => (
                 <a key={label} href={href!} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-1.5 rounded-full bg-surface px-3.5 text-[13px] font-medium ring-1 ring-line-strong hover:bg-sunken">
-                  <Icon className="size-4" /> {label} <ExternalLink className="size-3 text-faint" />
+                  <Icon className="size-4" /> {label} <ExternalLink className="size-3 text-muted" />
                 </a>
               ))}
               {d.isMember && (

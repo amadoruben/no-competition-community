@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { logoutAction } from "@/app/actions";
 import { Avatar } from "./ui";
 
-export function UserMenu({ name, handle, hue, roleLabel }: { name: string; handle: string; hue: number; roleLabel: string }) {
+export function UserMenu({ name, handle, hue, fileId, roleLabel }: { name: string; handle: string; hue: number; fileId?: string | null; roleLabel: string }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -29,9 +29,10 @@ export function UserMenu({ name, handle, hue, roleLabel }: { name: string; handl
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="menu"
+        aria-label={`Conta de ${name}`}
         className="flex items-center gap-2 rounded-full p-0.5 pr-0.5 transition-colors hover:bg-sunken sm:pr-3"
       >
-        <Avatar name={name} hue={hue} size={34} />
+        <Avatar name={name} hue={hue} fileId={fileId} size={34} />
         <span className="hidden text-left sm:block">
           <span className="block text-[13px] leading-tight font-medium">{name.split(" ")[0]}</span>
           <span className="block text-[11px] leading-tight text-muted">{roleLabel}</span>

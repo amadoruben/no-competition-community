@@ -45,7 +45,7 @@ export function ResultsForm({ challengeId, rows, prizes }: { challengeId: string
                   </td>
                   <td className="tabular px-3 py-3 text-right font-mono">
                     {fmtScore(r.score)}
-                    <div className="text-[11px] text-faint">{r.evaluationCount} aval.</div>
+                    <div className="text-[11px] text-muted">{r.evaluationCount} aval.</div>
                   </td>
                   <td className="px-3 py-3">
                     <select name={`rank:${r.submissionId}`} defaultValue={String(defaultRank)} aria-label={`Posição de ${r.projectName}`} className={cx(controlClass, "h-9 w-32 text-sm")}>

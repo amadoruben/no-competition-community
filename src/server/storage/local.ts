@@ -13,7 +13,7 @@ export class LocalStorageProvider implements StorageProvider {
     return full;
   }
 
-  async put(key: string, body: Uint8Array) {
+  async put(key: string, body: Uint8Array, _contentType?: string) {
     const full = this.resolve(key);
     await fs.mkdir(path.dirname(full), { recursive: true });
     await fs.writeFile(full, body);

@@ -42,7 +42,7 @@ export default async function ReviewHome() {
                       <Progress value={r.submissions ? (mine / r.submissions) * 100 : 0} tone="volt" />
                     </div>
                   </div>
-                  <ArrowRight className="m-5 size-4 self-center text-faint" />
+                  <ArrowRight className="m-5 size-4 self-center text-muted" />
                 </Card>
               </Link>
             );

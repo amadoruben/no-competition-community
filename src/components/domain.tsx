@@ -183,7 +183,7 @@ export function PostCard({ item, compact, full }: { item: FeedItem; compact?: bo
 }
 
 export function ScorePill({ score, className }: { score: number | null; className?: string }) {
-  if (score === null) return <span className={cx("tabular text-sm text-faint", className)}>—</span>;
+  if (score === null) return <span className={cx("tabular text-sm text-muted", className)}>—</span>;
   const tone = score >= 80 ? "bg-ok-soft text-ok" : score >= 65 ? "bg-volt-soft text-ink" : score >= 50 ? "bg-warn-soft text-warn" : "bg-bad-soft text-bad";
   return (
     <span className={cx("tabular inline-flex h-7 min-w-12 items-center justify-center rounded-lg px-2 text-sm font-semibold", tone, className)}>

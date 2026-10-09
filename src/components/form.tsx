@@ -114,7 +114,7 @@ export function SubmitButton({
 }
 
 const control =
-  "w-full rounded-xl bg-surface px-3.5 text-[15px] text-ink ring-1 ring-line-strong ring-inset placeholder:text-faint transition-shadow focus:ring-2 focus:ring-ink focus:outline-none aria-[invalid=true]:ring-bad";
+  "w-full rounded-xl bg-surface px-3.5 text-[15px] text-ink ring-1 ring-line-strong ring-inset placeholder:text-muted transition-shadow focus:ring-2 focus:ring-ink focus:outline-none aria-[invalid=true]:ring-bad";
 
 export function Field({
   name,

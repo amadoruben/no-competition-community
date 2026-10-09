@@ -15,11 +15,14 @@ export class SupabaseAuthProvider implements AuthProvider {
   constructor(
     private url = required("NEXT_PUBLIC_SUPABASE_URL"),
     private publishableKey = required("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"),
+    /** Injectable for contract tests; defaults to global fetch. */
+    private fetchImpl?: typeof fetch,
   ) {}
 
   private async client() {
     const jar = await cookies();
     return createServerClient(this.url, this.publishableKey, {
+      ...(this.fetchImpl ? { global: { fetch: this.fetchImpl } } : {}),
       cookies: {
         getAll: () => jar.getAll(),
         setAll: (list) => {
