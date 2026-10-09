@@ -1,6 +1,7 @@
 import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
 import { drizzle as drizzlePostgres } from "drizzle-orm/postgres-js";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
+import net from "node:net";
 import postgres from "postgres";
 import * as schema from "./schema";
 import { databaseUrlFrom, sslFor } from "../lib/supabase-env";
@@ -41,22 +42,50 @@ export function openDatabase(url: string | undefined = undefined): DbHandle {
     const client = target === "memory" ? new PGlite() : new PGlite(target);
     return { db: drizzlePglite(client, { schema }) as unknown as DB, driver: "pglite", close: () => client.close() };
   }
+  const statementTimeoutMs = Number(process.env.DATABASE_STATEMENT_TIMEOUT_MS || 15000);
   const client = postgres(url, {
     prepare: false,
-    // postgres.js defaults to no TLS; Supabase endpoints always get it.
-    ssl: sslFor(url),
-    // Keep pools small on serverless (many instances × pool ≤ pooler limit).
-    max: Number(process.env.DATABASE_POOL_MAX || (process.env.VERCEL ? 1 : 10)),
+    // Supported by postgres.js (README: "socket") but missing from its type definitions.
+    ...({ socket: watchedSocket(Number(process.env.DATABASE_SOCKET_TIMEOUT_MS || statementTimeoutMs + 10_000)) } as object),
+    // postgres.js defaults to no TLS; Supabase endpoints always get it. Only set
+    // when defined: an explicit `ssl: undefined` would override ?sslmode= in the URL.
+    ...(sslFor(url) ? { ssl: sslFor(url) } : {}),
+    // Keep pools small on serverless (many instances × pool ≤ pooler limit),
+    // but above 1: one instance serves concurrent requests (Fluid compute).
+    max: Number(process.env.DATABASE_POOL_MAX || (process.env.VERCEL ? 3 : 10)),
     connect_timeout: Number(process.env.DATABASE_CONNECT_TIMEOUT_S || 10),
     idle_timeout: 20,
     max_lifetime: 60 * 30,
     connection: {
-      statement_timeout: Number(process.env.DATABASE_STATEMENT_TIMEOUT_MS || 15000),
+      statement_timeout: statementTimeoutMs,
       application_name: "no-competition-community",
     },
     onnotice: () => {},
   });
   return { db: drizzlePostgres(client, { schema }) as unknown as DB, driver: "postgres", close: () => client.end({ timeout: 5 }) };
+}
+
+/**
+ * TCP socket that is destroyed after `idleMs` without any traffic.
+ *
+ * statement_timeout bounds a query on the server, but not a connection that
+ * died silently (e.g. a pooled socket kept across a serverless instance
+ * suspension, or a dropped NAT mapping): the query would wait forever, and
+ * every later query queued behind it. With this watchdog such a query fails
+ * with DB_SOCKET_TIMEOUT (reported as "service unavailable") and the pool
+ * opens a fresh connection. A healthy query always produces traffic before
+ * statement_timeout, so `idleMs` must exceed it.
+ */
+function watchedSocket(idleMs: number) {
+  // Returned before it connects (writes are buffered): postgres.js then sees
+  // connection errors and closes on this socket and runs its normal error,
+  // reconnect and pool bookkeeping. connect_timeout still applies.
+  return (o: { host: string[]; port: number[]; path?: string | false }) => {
+    const s = o.path ? net.connect(o.path) : net.connect({ host: o.host[0], port: o.port[0] });
+    Object.assign(s, { host: o.host[0], port: o.port[0] }); // TLS SNI uses socket.host
+    s.setTimeout(idleMs, () => s.destroy(Object.assign(new Error(`Database connection idle for ${idleMs} ms`), { code: "DB_SOCKET_TIMEOUT" })));
+    return s;
+  };
 }
 
 // One handle per process (reused across hot reloads in development).

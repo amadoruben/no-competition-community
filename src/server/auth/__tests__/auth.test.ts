@@ -115,3 +115,54 @@ describe("SupabaseAuthProvider (contract against the Supabase Auth HTTP API)", (
     expect(await errKind(sb.completePasswordReset({ token: "th:stale-hash", password: "new-password-1" }))).toBe("invalid");
   });
 });
+
+describe("SupabaseAuthProvider sign-up: every outcome is a clear answer, never a hang", () => {
+  // The API-version header is what makes the client read `code` (as Supabase Auth sends it).
+  const json = (status: number, body: unknown) =>
+    new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "x-supabase-api-version": "2024-01-01" } });
+  const user = (identities: unknown[]) => ({ id: "0b6c7a52-3f7e-4f7a-9d55-2f4a1c9e8b10", email: "new@example.test", aud: "authenticated", role: "authenticated", identities });
+  // Keyed by the email's local part.
+  const fakeFetch: typeof fetch = (input, init) => {
+    const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
+    if (url.pathname !== "/auth/v1/signup") return Promise.resolve(json(404, {}));
+    const who = String(JSON.parse(String(init?.body)).email).split("@")[0];
+    if (who === "hang")
+      // Never answers; only the abort signal ends it (like a stalled connection).
+      return new Promise((_, reject) => init?.signal?.addEventListener("abort", () => reject(init.signal!.reason)));
+    if (who === "dup") return Promise.resolve(json(422, { code: "user_already_exists", msg: "User already registered" }));
+    if (who === "smtp") return Promise.resolve(json(500, { code: "unexpected_failure", msg: "Error sending confirmation email" }));
+    if (who === "notteam") return Promise.resolve(json(400, { code: "email_address_not_authorized", msg: "Email address not authorized" }));
+    if (who === "limit") return Promise.resolve(json(429, { code: "over_email_send_rate_limit", msg: "email rate limit exceeded" }));
+    if (who === "down") return Promise.resolve(json(503, { msg: "upstream unavailable" }));
+    if (who === "weak") return Promise.resolve(json(422, { code: "weak_password", msg: "Password should be at least 8 characters" }));
+    if (who === "known") return Promise.resolve(json(200, user([]))); // existing address, enumeration-safe answer
+    return Promise.resolve(json(200, user([{ id: "1", provider: "email" }])));
+  };
+  const sb = new SupabaseAuthProvider("https://project.supabase.test", "sb_publishable_test", fakeFetch, 100);
+  const outcome = (local: string) =>
+    sb.signUp(`${local}@example.test`, "a-good-password").then(
+      (r) => `ok:${r.needsEmailConfirmation ? "confirm" : "session"}`,
+      (e) => (e instanceof AuthError ? `${e.kind}:${e.message}` : `raw:${String(e)}`),
+    );
+
+  it("creates the account and asks for email confirmation", async () => {
+    expect(await outcome("new")).toBe("ok:confirm");
+  });
+
+  it("gives up after the timeout with an 'unavailable' message instead of hanging", async () => {
+    const started = Date.now();
+    expect(await outcome("hang")).toMatch(/^unavailable:O serviço de autenticação não respondeu a tempo/);
+    expect(Date.now() - started).toBeLessThan(2_000);
+  });
+
+  it("maps provider answers to Portuguese messages (no raw provider text)", async () => {
+    expect(await outcome("dup")).toMatch(/^exists:Já existe uma conta/);
+    expect(await outcome("known")).toMatch(/^exists:Já existe uma conta/);
+    expect(await outcome("smtp")).toMatch(/^unavailable:Não foi possível enviar o email de confirmação/);
+    expect(await outcome("notteam")).toMatch(/^unavailable:Não foi possível enviar o email de confirmação/);
+    expect(await outcome("limit")).toMatch(/^throttled:Foram enviados demasiados emails/);
+    expect(await outcome("down")).toMatch(/^unavailable:/);
+    expect(await outcome("weak")).toMatch(/^invalid:A palavra-passe é demasiado fraca/);
+  });
+});
+

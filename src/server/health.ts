@@ -23,10 +23,14 @@ export async function healthReport(timeoutMs = 3000): Promise<HealthReport> {
       const rows = r ? ((Array.isArray(r) ? r : (r as { rows: { n: number }[] }).rows) as { n: number }[]) : [];
       return rows[0]?.n;
     })();
+    // The probe may settle after the deadline: observe it so a late failure is
+    // not an unhandled rejection (which terminates the serverless instance).
+    probe.catch(() => {});
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const migrations = await Promise.race([
       probe,
-      new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), timeoutMs)),
-    ]);
+      new Promise<never>((_, rej) => (timer = setTimeout(() => rej(new Error("timeout")), timeoutMs))),
+    ]).finally(() => clearTimeout(timer));
     database = { ok: true, latencyMs: Date.now() - started, migrations };
   } catch (e) {
     database = { ok: false, error: e instanceof Error && e.message === "timeout" ? "timeout" : "unreachable" };

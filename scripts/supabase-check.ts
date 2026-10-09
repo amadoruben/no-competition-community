@@ -64,6 +64,32 @@ async function checkDatabase(label: string, url: string | undefined) {
   }
 }
 
+/**
+ * Sessions that can stall the application: transactions left open and queries
+ * waiting on a lock. Reports counts and durations only (no query text).
+ */
+async function checkSessions(h: { db: Awaited<ReturnType<typeof openDatabase>>["db"] }) {
+  try {
+    const res = await h.db.execute(sql`
+      select coalesce(nullif(application_name, ''), '(unnamed)') as app, coalesce(state, '?') as state, count(*)::int as n,
+             coalesce(max(extract(epoch from now() - xact_start)), 0)::int as xact_s,
+             count(*) filter (where cardinality(pg_blocking_pids(pid)) > 0)::int as blocked
+      from pg_stat_activity
+      where datname = current_database() and backend_type = 'client backend' and pid <> pg_backend_pid()
+      group by 1, 2 order by 3 desc`);
+    const rows = (Array.isArray(res) ? res : (res as unknown as { rows: unknown[] }).rows) as { app: string; state: string; n: number; xact_s: number; blocked: number }[];
+    const total = rows.reduce((a, r) => a + r.n, 0);
+    report("ok", `Sessions: ${total} other client connection(s)${rows.length ? ` — ${rows.map((r) => `${r.app}/${r.state}×${r.n}`).join(", ")}` : ""}`);
+    for (const r of rows) {
+      if (r.state.startsWith("idle in transaction") && r.xact_s > 60) report("warn", `${r.n} session(s) of ${r.app} idle in an open transaction for up to ${r.xact_s}s — they hold locks`);
+      if (r.state === "active" && r.xact_s > 30) report("warn", `${r.n} session(s) of ${r.app} running for up to ${r.xact_s}s`);
+      if (r.blocked) report("warn", `${r.blocked} session(s) of ${r.app} waiting on a lock`);
+    }
+  } catch (e) {
+    report("warn", `Sessions: not visible to this role — ${reason(e)}`);
+  }
+}
+
 /** Names of the values still to provide (DATABASE_MIGRATION_URL is derived, never required). */
 function missingValues(env: NodeJS.ProcessEnv) {
   const missing: string[] = [];
@@ -175,6 +201,7 @@ async function main() {
     } catch (e) {
       report("error", reason(e));
     }
+    await checkSessions(h);
   }
   if (run && run !== mig) await run.close();
   await mig?.close();

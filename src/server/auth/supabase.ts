@@ -4,6 +4,8 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { TOKEN_HASH_PREFIX } from "@/lib/auth-links";
 import { publishableKey as envPublishableKey, SECRET_KEY_VAR, secretKey, supabaseUrl } from "@/lib/supabase-env";
+import { authTimeoutMs, timedFetch } from "@/lib/timed-fetch";
+import { logger } from "../logger";
 import { AuthError, type AuthIdentity, type AuthProvider, type EmailLink } from "./types";
 
 /**
@@ -18,13 +20,20 @@ export class SupabaseAuthProvider implements AuthProvider {
     private url = required("NEXT_PUBLIC_SUPABASE_URL", supabaseUrl(process.env)),
     private publishableKey = required("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", envPublishableKey(process.env)),
     /** Injectable for contract tests; defaults to global fetch. */
-    private fetchImpl?: typeof fetch,
-  ) {}
+    fetchImpl?: typeof fetch,
+    timeoutMs = authTimeoutMs(),
+  ) {
+    // Every call to Supabase Auth is bounded: a slow or unreachable provider
+    // becomes a clear "unavailable" error instead of a request that never ends.
+    this.fetch = timedFetch(timeoutMs, fetchImpl);
+  }
+
+  private readonly fetch: typeof fetch;
 
   private async client() {
     const jar = await cookies();
     return createServerClient(this.url, this.publishableKey, {
-      ...(this.fetchImpl ? { global: { fetch: this.fetchImpl } } : {}),
+      global: { fetch: this.fetch },
       cookies: {
         getAll: () => jar.getAll(),
         setAll: (list) => {
@@ -39,15 +48,17 @@ export class SupabaseAuthProvider implements AuthProvider {
   }
 
   private admin(): SupabaseClient {
-    return createClient(this.url, required(SECRET_KEY_VAR, secretKey(process.env)), { auth: { persistSession: false, autoRefreshToken: false } });
+    return createClient(this.url, required(SECRET_KEY_VAR, secretKey(process.env)), {
+      auth: { persistSession: false, autoRefreshToken: false },
+      global: { fetch: this.fetch },
+    });
   }
 
   async signIn(email: string, password: string): Promise<AuthIdentity> {
     const { data, error } = await (await this.client()).auth.signInWithPassword({ email, password });
     if (error || !data.user) {
-      if (error?.status === 429) throw new AuthError("Demasiadas tentativas. Aguarde alguns minutos e tente de novo.", "throttled");
       if (error?.code === "email_not_confirmed") throw new AuthError("Confirme o seu email antes de entrar.", "unconfirmed");
-      throw new AuthError("Email ou palavra-passe incorrectos.");
+      throw providerError("signIn", error) ?? new AuthError("Email ou palavra-passe incorrectos.");
     }
     return { subject: data.user.id, email: data.user.email! };
   }
@@ -58,10 +69,10 @@ export class SupabaseAuthProvider implements AuthProvider {
       password,
       options: opts?.confirmRedirect ? { emailRedirectTo: opts.confirmRedirect } : undefined,
     });
-    if (error || !data.user) {
-      if (error?.code === "user_already_exists") throw new AuthError("Já existe uma conta com este email.", "exists");
-      throw new AuthError(error?.message ?? "Não foi possível criar a conta.");
-    }
+    if (error || !data.user) throw signUpError(error);
+    // With email confirmation on, Supabase answers a sign-up for an existing
+    // address with a placeholder user that has no identities (no enumeration).
+    if (data.user.identities?.length === 0) throw new AuthError(EXISTS, "exists");
     return { identity: { subject: data.user.id, email: data.user.email! }, needsEmailConfirmation: !data.session };
   }
 
@@ -70,7 +81,7 @@ export class SupabaseAuthProvider implements AuthProvider {
     const { data, error } = link.tokenHash
       ? await sb.auth.verifyOtp({ token_hash: link.tokenHash, type: (link.type ?? "email") as "email" | "signup" | "invite" | "magiclink" | "email_change" })
       : await sb.auth.exchangeCodeForSession(link.code ?? "");
-    if (error || !data.user) throw new AuthError(LINK_FAILED);
+    if (error || !data.user) throw providerError("exchangeCallback", error) ?? new AuthError(LINK_FAILED);
     return { subject: data.user.id, email: data.user.email! };
   }
 
@@ -84,8 +95,11 @@ export class SupabaseAuthProvider implements AuthProvider {
   }
 
   async requestPasswordReset(email: string, redirectTo: string) {
-    // Supabase returns success regardless of whether the email exists.
-    await (await this.client()).auth.resetPasswordForEmail(email, { redirectTo });
+    // Supabase returns success regardless of whether the email exists; only
+    // infrastructure failures and rate limits are reported.
+    const { error } = await (await this.client()).auth.resetPasswordForEmail(email, { redirectTo });
+    const e = providerError("requestPasswordReset", error);
+    if (e) throw e;
   }
 
   /**
@@ -97,17 +111,21 @@ export class SupabaseAuthProvider implements AuthProvider {
     const { error: exchangeError } = token.startsWith(TOKEN_HASH_PREFIX)
       ? await sb.auth.verifyOtp({ token_hash: token.slice(TOKEN_HASH_PREFIX.length), type: "recovery" })
       : await sb.auth.exchangeCodeForSession(token);
-    if (exchangeError) throw new AuthError(`${LINK_FAILED} Peça um novo.`);
+    if (exchangeError) throw providerError("completePasswordReset", exchangeError) ?? new AuthError(`${LINK_FAILED} Peça um novo.`);
     const { data, error } = await sb.auth.updateUser({ password });
-    if (error || !data.user) throw new AuthError("Não foi possível actualizar a palavra-passe.");
+    if (error || !data.user) {
+      if (error?.code === "same_password") throw new AuthError("A nova palavra-passe tem de ser diferente da anterior.");
+      if (error?.code === "weak_password") throw new AuthError(WEAK_PASSWORD);
+      throw providerError("completePasswordReset", error) ?? new AuthError("Não foi possível actualizar a palavra-passe.");
+    }
     return { subject: data.user.id, email: data.user.email! };
   }
 
   async provisionIdentity(email: string, password: string): Promise<AuthIdentity> {
     const { data, error } = await this.admin().auth.admin.createUser({ email, password, email_confirm: true });
     if (error || !data.user) {
-      if (error?.code === "email_exists") throw new AuthError("Já existe uma conta com este email.", "exists");
-      throw new AuthError(error?.message ?? "Falha ao criar identidade.");
+      if (error?.code === "email_exists") throw new AuthError(EXISTS, "exists");
+      throw providerError("provisionIdentity", error) ?? new AuthError(error?.message ?? "Falha ao criar identidade.");
     }
     return { subject: data.user.id, email: data.user.email! };
   }
@@ -115,6 +133,55 @@ export class SupabaseAuthProvider implements AuthProvider {
 
 // PKCE links only work in the browser that asked for them; say so instead of a bare "expired".
 const LINK_FAILED = "O link expirou, já foi utilizado ou foi aberto noutro browser — abra-o no mesmo browser onde fez o pedido.";
+const EXISTS = "Já existe uma conta com este email. Entre ou recupere a palavra-passe.";
+const WEAK_PASSWORD = "A palavra-passe é demasiado fraca. Use pelo menos 8 caracteres, misturando letras e números.";
+export const AUTH_UNAVAILABLE =
+  "O serviço de autenticação não respondeu a tempo. Nada foi alterado do nosso lado — tente novamente dentro de momentos.";
+
+type ProviderError = { name?: string; status?: number; code?: string; message?: string } | null | undefined;
+
+/**
+ * Failures that are not about the user's input: provider unreachable or slow
+ * (fetch aborted → status 0), provider errors (5xx) and rate limits. Logged
+ * with status and code only (never the email). Returns null for input errors,
+ * which each caller maps to its own message.
+ */
+function providerError(op: string, e: ProviderError): AuthError | null {
+  if (!e) return null;
+  const status = e.status ?? 0;
+  const code = e.code ?? "";
+  const unavailable =
+    status === 0 || status >= 500 || e.name === "AuthRetryableFetchError" || ["request_timeout", "unexpected_failure", "hook_timeout", "hook_timeout_after_retry", "conflict"].includes(code);
+  const throttled = status === 429 || code.startsWith("over_");
+  if (!unavailable && !throttled) return null;
+  logger.warn("auth.provider_error", { op, status, code, name: e.name, message: e.message });
+  if (throttled)
+    return new AuthError(
+      code === "over_email_send_rate_limit"
+        ? "Foram enviados demasiados emails para este endereço. Aguarde alguns minutos e tente de novo."
+        : "Demasiadas tentativas. Aguarde alguns minutos e tente de novo.",
+      "throttled",
+    );
+  return new AuthError(AUTH_UNAVAILABLE, "unavailable");
+}
+
+function signUpError(e: ProviderError): AuthError {
+  const code = e?.code ?? "";
+  if (code === "user_already_exists" || code === "email_exists") return new AuthError(EXISTS, "exists");
+  if (code === "weak_password") return new AuthError(WEAK_PASSWORD);
+  if (code === "email_address_invalid") return new AuthError("Este endereço de email não é aceite. Use outro endereço.");
+  if (code === "signup_disabled" || code === "email_provider_disabled") return new AuthError("Os registos estão temporariamente fechados.");
+  // Default Supabase SMTP only delivers to the organisation's team members;
+  // a failed confirmation email must not look like "account created".
+  if (code === "email_address_not_authorized" || /error sending .*email/i.test(e?.message ?? "")) {
+    logger.warn("auth.provider_error", { op: "signUp", status: e?.status, code, message: e?.message });
+    return new AuthError("Não foi possível enviar o email de confirmação para este endereço. A conta não ficou activa — tente mais tarde ou contacte o suporte.", "unavailable");
+  }
+  const other = providerError("signUp", e);
+  if (other) return other;
+  logger.warn("auth.provider_error", { op: "signUp", status: e?.status, code, message: e?.message });
+  return new AuthError("Não foi possível criar a conta. Verifique os dados e tente novamente.");
+}
 
 function required(name: string, v: string | undefined) {
   if (!v) throw new Error(`${name} is required when AUTH_PROVIDER=supabase`);

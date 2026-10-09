@@ -39,9 +39,12 @@ export interface AuthProvider {
   provisionIdentity(email: string, password: string): Promise<AuthIdentity>;
 }
 
-/** Thrown for invalid credentials or tokens. Message is safe to display. */
+/**
+ * Thrown for invalid credentials or tokens, and when the provider cannot be
+ * reached in time ("unavailable"). Message is safe to display.
+ */
 export class AuthError extends Error {
-  constructor(message: string, public kind: "invalid" | "throttled" | "exists" | "unconfirmed" = "invalid") {
+  constructor(message: string, public kind: "invalid" | "throttled" | "exists" | "unconfirmed" | "unavailable" = "invalid") {
     super(message);
     this.name = "AuthError";
   }

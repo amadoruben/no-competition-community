@@ -107,12 +107,19 @@ export async function demoLoginAction(fd: FormData) {
 
 export async function registerAction(_: ActionState, fd: FormData): Promise<ActionState> {
   let dest = "/dashboard?welcome=1";
+  // Elapsed ms at the end of each step, so a slow step is visible in the logs (no personal data).
+  const t0 = Date.now();
+  const steps: Record<string, number> = {};
   const r = await attempt(async () => {
     const v = await validateRegistration({ name: str(fd, "name"), email: str(fd, "email"), password: str(fd, "password") });
+    steps.validated = Date.now() - t0;
     const { identity, needsEmailConfirmation } = await auth().signUp(v.email, v.password, { confirmRedirect: `${await origin()}/auth/callback` });
+    steps.signedUp = Date.now() - t0;
     await resolveUser(identity, v.name);
+    steps.profile = Date.now() - t0;
     if (needsEmailConfirmation) dest = "/login?confirm=1";
   });
+  logger.info("auth.register", { ok: r.ok, steps, totalMs: Date.now() - t0, ...(r.ok ? { confirm: dest.startsWith("/login") } : { error: r.error }) });
   if (!r.ok) return r;
   redirect(dest);
 }

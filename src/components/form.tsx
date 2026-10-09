@@ -2,12 +2,43 @@
 
 import clsx from "clsx";
 import { Check, LoaderCircle } from "lucide-react";
-import { createContext, startTransition, useActionState, useContext, useEffect, useRef, type ComponentProps, type ReactNode } from "react";
+import { unstable_rethrow } from "next/navigation";
+import { createContext, startTransition, useActionState, useContext, useEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import type { ActionState } from "@/lib/action-state";
 import { toast } from "./toaster";
 import { buttonClass } from "./ui";
 
 const FormCtx = createContext<{ state: ActionState; pending: boolean }>({ state: null, pending: false });
+
+/** After this, the form says the server is slow; after DEADLINE it stops waiting and says so. */
+const SLOW_MS = 8_000;
+const DEADLINE_MS = 45_000;
+const NO_ANSWER =
+  "O servidor não respondeu a tempo. O pedido pode ainda estar a ser processado: aguarde um minuto e verifique (por exemplo, o seu email) antes de tentar de novo.";
+const NETWORK = "Não foi possível contactar o servidor. Verifique a ligação à internet e tente novamente.";
+const SERVER =
+  "O serviço está temporariamente indisponível e não foi possível confirmar a operação. Recarregue a página para verificar antes de tentar de novo.";
+
+class Deadline extends Error {}
+
+/**
+ * The server action's result, or a displayable error when it fails in transit
+ * (network down), fails on the server (crash, platform timeout) or takes longer than
+ * DEADLINE_MS. Never leaves the form pending forever. Next.js navigation
+ * signals (redirect, notFound) are rethrown untouched.
+ */
+async function settle(run: Promise<ActionState>): Promise<ActionState> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([run, new Promise<never>((_, rej) => (timer = setTimeout(() => rej(new Deadline()), DEADLINE_MS)))]);
+  } catch (e) {
+    unstable_rethrow(e);
+    // fetch() rejects with a TypeError when the request never reached the server.
+    return { ok: false, error: e instanceof Deadline ? NO_ANSWER : e instanceof TypeError ? NETWORK : SERVER, at: Date.now() };
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 /**
  * Form bound to a server action. Submits without resetting fields (so input is
@@ -32,12 +63,22 @@ export function ActionForm({
   // Toast from inside the action so it fires even if this form unmounts when
   // the page re-renders into its next state (e.g. "enrol" → "enrolled").
   const [state, dispatch, pending] = useActionState(async (prev: ActionState, fd: FormData) => {
-    const r = await action(prev, fd);
+    const r = await settle(action(prev, fd));
     if (r?.ok && r.message) toast(r.message);
     return r;
   }, null);
   const ref = useRef<HTMLFormElement>(null);
   const lastAt = useRef<number | undefined>(undefined);
+  const [slow, setSlow] = useState(false);
+
+  useEffect(() => {
+    if (!pending) return;
+    const t = setTimeout(() => setSlow(true), SLOW_MS);
+    return () => {
+      clearTimeout(t);
+      setSlow(false);
+    };
+  }, [pending]);
 
   useEffect(() => {
     if (!state || state.at === lastAt.current) return;
@@ -68,6 +109,11 @@ export function ActionForm({
         {...rest}
       >
         {children}
+        {pending && slow && (
+          <p role="status" className="mt-3 rounded-lg bg-warn-soft px-3 py-2 text-sm text-warn">
+            Está a demorar mais do que o habitual. Aguarde, por favor — não feche esta página.
+          </p>
+        )}
         {showMessages && <FormMessage />}
       </form>
     </FormCtx.Provider>
