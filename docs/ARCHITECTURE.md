@@ -57,7 +57,7 @@ Testado em `src/server/__tests__/flow.test.ts` (o avaliador nunca recebe dados d
 ## Base de dados
 
 - **Tecnologia:** PostgreSQL ≥ 15 (testado em 16 local e PGlite; Supabase actual usa 17). Sem extensões nem funcionalidades proprietárias.
-- **Drivers intercambiáveis** (`src/db/index.ts`): `postgres://…` → postgres.js (com `prepare: false`, compatível com poolers em modo transacção); `pglite://memory|<dir>` → Postgres embutido para testes e desenvolvimento sem servidor.
+- **Drivers intercambiáveis** (`src/db/index.ts`): `postgres://…` → node-postgres (`pg`), uma consulta de cada vez por ligação — compatível com poolers em modo transacção (postgres.js não é: encadeia consultas na mesma ligação, ver `docs/OPERATIONS.md` §5); `pglite://memory|<dir>` → Postgres embutido para testes e desenvolvimento sem servidor.
 - **Migrações versionadas** em `drizzle/` (geradas com `npm run db:generate`, aplicadas com `npm run db:migrate`, protegidas por *advisory lock*).
 - **RLS** activo em todas as tabelas sem políticas (`drizzle/0001_rls_lockdown.sql`): a Data API do Supabase (anon/authenticated) não vê nada; a aplicação liga-se como dona das tabelas. Um teste falha se alguma tabela nova ficar sem RLS.
 - **IDs** UUID; **datas** `timestamptz`; **JSON** `jsonb`.
@@ -92,7 +92,7 @@ Interface `StorageProvider` (put/get/delete/signedUrl). A BD guarda só uma **ch
 | TypeScript | 5.9.3 |
 | Tailwind CSS | 4.3.3 |
 | Drizzle ORM / Kit | 0.45.4 / 0.31.11 |
-| postgres (postgres.js) | 3.4.9 |
+| pg (node-postgres) | 8.23.0 |
 | @electric-sql/pglite | 0.5.8 |
 | @supabase/supabase-js / @supabase/ssr | 2.117.1 / 0.12.7 |
 | zod | 4.6.5 |

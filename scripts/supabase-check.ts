@@ -46,7 +46,7 @@ const reason = (e: unknown) => {
   // Drizzle wraps driver errors ("Failed query: …"); the useful part is the innermost cause.
   let err = e as { code?: string; message?: string; cause?: unknown };
   while (err?.cause) err = err.cause as typeof err;
-  // postgres.js and fetch errors never include the connection string; strip any URL defensively.
+  // Driver and fetch errors never include the connection string; strip any URL defensively.
   return `${err.code ? `${err.code}: ` : ""}${String(err.message ?? e).replace(/\w+:\/\/\S+/g, "<url>")}`;
 };
 

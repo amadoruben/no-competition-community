@@ -68,8 +68,8 @@ export const SECRET_KEY_VAR = "SUPABASE_SECRET_KEY";
 const PASSWORD_PLACEHOLDER = /\[YOUR[-_]PASSWORD\]|%5BYOUR[-_]PASSWORD%5D/i;
 export const hasPasswordPlaceholder = (url: string | undefined) => !!url && PASSWORD_PLACEHOLDER.test(url);
 
-// Query parameters postgres.js understands; it would forward anything else (e.g. Prisma's
-// "pgbouncer=true" from the Connect dialog) to the server as a setting and fail.
+// Connection-string parameters we keep; anything else (e.g. Prisma's "pgbouncer=true"
+// from the Connect dialog) is dropped rather than risk being sent to the server as a setting.
 const DRIVER_PARAMS = new Set(["sslmode", "sslrootcert", "application_name", "options", "target_session_attrs"]);
 
 /**

@@ -5,7 +5,7 @@
  */
 const NETWORK_CODES = new Set([
   "ECONNREFUSED", "ECONNRESET", "ETIMEDOUT", "ENOTFOUND", "EAI_AGAIN", "EHOSTUNREACH", "EPIPE",
-  "CONNECT_TIMEOUT", "CONNECTION_CLOSED", "CONNECTION_ENDED", "CONNECTION_DESTROYED", "DB_SOCKET_TIMEOUT",
+  "CONNECT_TIMEOUT", "CONNECTION_CLOSED", "CONNECTION_ENDED", "CONNECTION_DESTROYED",
 ]);
 
 // SQLSTATE classes: 08 connection exception, 53 insufficient resources,
@@ -17,7 +17,7 @@ export function isInfraUnavailable(e: unknown): boolean {
     const code = String((cur as { code?: unknown }).code ?? "");
     if (NETWORK_CODES.has(code) || SQLSTATE_UNAVAILABLE.test(code)) return true;
     const msg = String((cur as { message?: unknown }).message ?? "");
-    if (/connect(ion)? (timeout|refused|terminated)|timeout exceeded|too many clients|Connection terminated/i.test(msg)) return true;
+    if (/connect(ion)? (timeout|refused|terminated)|timeout exceeded|too many clients|Connection terminated|Query read timeout/i.test(msg)) return true;
   }
   return false;
 }

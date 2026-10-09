@@ -1,9 +1,8 @@
 import { drizzle as drizzlePglite } from "drizzle-orm/pglite";
-import { drizzle as drizzlePostgres } from "drizzle-orm/postgres-js";
+import { drizzle as drizzlePg } from "drizzle-orm/node-postgres";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
-import net from "node:net";
-import tls from "node:tls";
-import postgres from "postgres";
+import { attachDatabasePool } from "@vercel/functions";
+import pg from "pg";
 import * as schema from "./schema";
 import { databaseUrlFrom, sslFor } from "../lib/supabase-env";
 
@@ -11,8 +10,11 @@ import { databaseUrlFrom, sslFor } from "../lib/supabase-env";
  * One PostgreSQL database, two interchangeable drivers:
  *
  * - `postgres://…` (production, Supabase or any managed/self-hosted Postgres)
- *   via postgres.js. `prepare: false` keeps it compatible with transaction-mode
- *   poolers such as Supavisor/PgBouncer, which serverless hosts require.
+ *   via node-postgres (pg). It runs one query at a time per connection, which
+ *   transaction-mode poolers (Supavisor, PgBouncer — required on serverless)
+ *   need: postgres.js pipelines concurrent queries on one connection, and
+ *   through Supavisor those queries can hang forever or receive another
+ *   query's rows (Supabase docs, Postgres.js guide; porsager/postgres#970).
  * - `pglite://memory` or `pglite://<dir>` — embedded Postgres (WASM) for tests
  *   and zero-setup local development. Same SQL, same migrations.
  *
@@ -24,6 +26,8 @@ export interface DbHandle {
   db: DB;
   driver: "postgres" | "pglite";
   close(): Promise<void>;
+  /** Run `fn` on one dedicated connection (session state such as advisory locks holds across its queries). */
+  session<T>(fn: (db: DB) => Promise<T>): Promise<T>;
 }
 
 /** DATABASE_URL as pasted from Supabase → Connect, normalised (see lib/supabase-env). */
@@ -41,112 +45,64 @@ export function openDatabase(url: string | undefined = undefined): DbHandle {
     const { PGlite } = require("@electric-sql/pglite") as typeof import("@electric-sql/pglite");
     const target = url.slice("pglite://".length);
     const client = target === "memory" ? new PGlite() : new PGlite(target);
-    return { db: drizzlePglite(client, { schema }) as unknown as DB, driver: "pglite", close: () => client.close() };
+    const db = drizzlePglite(client, { schema }) as unknown as DB;
+    return { db, driver: "pglite", close: () => client.close(), session: (fn) => fn(db) };
   }
   const statementTimeoutMs = Number(process.env.DATABASE_STATEMENT_TIMEOUT_MS || 15000);
-  const connectTimeoutS = Number(process.env.DATABASE_CONNECT_TIMEOUT_S || 10);
-  const client = postgres(url, {
-    prepare: false,
-    // Supported by postgres.js (README: "socket") but missing from its type definitions.
-    ...({ socket: watchedSocket(Number(process.env.DATABASE_SOCKET_TIMEOUT_MS || statementTimeoutMs + 10_000), connectTimeoutS * 1000, tlsModeFor(url)) } as object),
-    // TLS is negotiated by the socket factory below (sslmode from the URL;
-    // always required for Supabase endpoints), so postgres.js must not add its own.
-    ssl: false,
-    // postgres.js loads the array type catalogue on every new connection and
-    // does not handle that query's failure (an unhandled rejection that
-    // terminates a serverless instance). The schema has no array columns.
-    fetch_types: false,
+  const { connectionString, ssl } = pgTarget(url);
+  const pool = new pg.Pool({
+    connectionString,
+    ssl,
     // Keep pools small on serverless (many instances × pool ≤ pooler limit),
     // but above 1: one instance serves concurrent requests (Fluid compute).
     max: Number(process.env.DATABASE_POOL_MAX || (process.env.VERCEL ? 3 : 10)),
-    connect_timeout: connectTimeoutS,
-    idle_timeout: 20,
-    max_lifetime: 60 * 30,
-    connection: {
-      statement_timeout: statementTimeoutMs,
-      application_name: "no-competition-community",
-    },
-    onnotice: () => {},
+    // Bounds both opening a connection and waiting for a free one.
+    connectionTimeoutMillis: Number(process.env.DATABASE_CONNECT_TIMEOUT_S || 10) * 1000,
+    idleTimeoutMillis: 10_000,
+    maxLifetimeSeconds: 60 * 30,
+    // Server-side limit, and a client-side one for when no answer comes back
+    // at all (dead connection): the query fails instead of waiting forever,
+    // and the pool discards that connection.
+    statement_timeout: statementTimeoutMs,
+    query_timeout: Number(process.env.DATABASE_QUERY_TIMEOUT_MS || statementTimeoutMs + 5_000),
+    application_name: "no-competition-community",
+    keepAlive: true,
   });
-  return { db: drizzlePostgres(client, { schema }) as unknown as DB, driver: "postgres", close: () => client.end({ timeout: 5 }) };
+  // An idle connection dropped by the server emits "error" on the pool; without
+  // a listener that would terminate the process. The pool replaces it.
+  pool.on("error", (e) => console.warn(JSON.stringify({ level: "warn", event: "db.idle_connection_lost", error: e.message })));
+  // Fluid compute: release idle connections before the instance is suspended,
+  // so no connection is reused after it silently died during the suspension.
+  if (process.env.VERCEL) attachDatabasePool(pool);
+  return {
+    db: drizzlePg(pool, { schema }) as unknown as DB,
+    driver: "postgres",
+    close: () => pool.end(),
+    session: async (fn) => {
+      const client = await pool.connect();
+      try {
+        return await fn(drizzlePg(client, { schema }) as unknown as DB);
+      } finally {
+        client.release();
+      }
+    },
+  };
 }
-
-/** TLS as libpq's sslmode asks for it; null = plain TCP. */
-type TlsMode = { prefer: boolean; rejectUnauthorized: boolean } | null;
-function tlsModeFor(url: string): TlsMode {
-  const q = new URL(url).searchParams;
-  const mode = q.get("sslmode") ?? (q.get("sslrootcert") === "system" ? "verify-full" : null) ?? sslFor(url) ?? "disable";
-  if (mode === "disable" || mode === "false") return null;
-  return { prefer: mode === "prefer" || mode === "allow", rejectUnauthorized: mode === "verify-full" || mode === "verify-ca" };
-}
-
-const SSL_REQUEST = Buffer.from([0, 0, 0, 8, 4, 210, 22, 47]); // length 8, code 80877103
 
 /**
- * Socket factory for postgres.js that guarantees no query waits forever.
- *
- * statement_timeout bounds a query on the server, but not a connection that
- * died silently (e.g. a pooled socket kept across a serverless instance
- * suspension, or a dropped NAT mapping): the query would wait forever, and
- * every later query queued behind it. Here the socket actually carrying the
- * traffic is destroyed after `idleMs` without any (DB_SOCKET_TIMEOUT, reported
- * as "service unavailable") and the pool opens a fresh connection. A healthy
- * query produces traffic before statement_timeout, so `idleMs` must exceed it.
- *
- * TLS is negotiated here (postgres.js is told ssl: false) because a timer on
- * the TCP socket stops seeing traffic once TLS wraps it.
- *
- * Never rejects: a failure resolves to a socket that errors right after
- * postgres.js has attached its listeners, so its own error, reconnect and
- * pool bookkeeping run exactly as for a refused TCP connection.
+ * TLS as libpq's sslmode asks for it (always for Supabase endpoints), with
+ * libpq's meaning: "require" encrypts without verifying the certificate,
+ * "verify-full"/"verify-ca" (or sslrootcert=system) verify it. The SSL
+ * parameters are removed from the URL because pg would otherwise apply its
+ * own interpretation of them over the `ssl` option.
  */
-function watchedSocket(idleMs: number, connectMs: number, mode: TlsMode) {
-  return (o: { host: string[]; port: number[]; path?: string | false }) =>
-    new Promise<net.Socket>((resolve) => {
-      const host = o.host[0];
-      let settled = false;
-      const done = (s: net.Socket) => {
-        if (settled) return;
-        settled = true;
-        s.setTimeout(idleMs, () => s.destroy(Object.assign(new Error(`Database connection idle for ${idleMs} ms`), { code: "DB_SOCKET_TIMEOUT" })));
-        resolve(s);
-      };
-      const fail = (err: Error) => {
-        if (settled) return;
-        settled = true;
-        raw.destroy();
-        const dead = new net.Socket();
-        setImmediate(() => dead.destroy(err));
-        resolve(dead);
-      };
-      const raw = o.path ? net.connect(o.path) : net.connect({ host, port: o.port[0] });
-      raw.setTimeout(connectMs, () => fail(Object.assign(new Error(`Database connection not established within ${connectMs} ms`), { code: "CONNECT_TIMEOUT" })));
-      raw.once("error", fail);
-      raw.once("connect", () => {
-        if (!mode) {
-          raw.setTimeout(0);
-          raw.off("error", fail);
-          return done(raw);
-        }
-        raw.write(SSL_REQUEST);
-        raw.once("data", (b: Buffer) => {
-          if (b[0] !== 0x53 /* S */) {
-            if (!mode.prefer) return fail(Object.assign(new Error("The database server does not accept TLS"), { code: "ECONNRESET" }));
-            raw.setTimeout(0);
-            raw.off("error", fail);
-            return done(raw);
-          }
-          const secure = tls.connect({ socket: raw, servername: net.isIP(host) ? undefined : host, rejectUnauthorized: mode.rejectUnauthorized });
-          secure.once("error", fail);
-          secure.once("secureConnect", () => {
-            raw.setTimeout(0);
-            raw.off("error", fail);
-            secure.off("error", fail);
-            done(secure);
-          });
-        });
-      });
-    });
+function pgTarget(url: string): { connectionString: string; ssl: false | { rejectUnauthorized: boolean } } {
+  const u = new URL(url);
+  const q = u.searchParams;
+  const mode = q.get("sslmode") ?? (q.get("sslrootcert") === "system" ? "verify-full" : null) ?? sslFor(url) ?? "disable";
+  for (const k of ["sslmode", "sslrootcert", "sslcert", "sslkey", "uselibpqcompat"]) q.delete(k);
+  const ssl = mode === "disable" || mode === "false" ? false : { rejectUnauthorized: mode === "verify-full" || mode === "verify-ca" };
+  return { connectionString: u.toString(), ssl };
 }
 
 // One handle per process (reused across hot reloads in development).
