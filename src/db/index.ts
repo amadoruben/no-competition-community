@@ -41,12 +41,13 @@ export function openDatabase(url: string | undefined = undefined): DbHandle {
   }
   const client = postgres(url, {
     prepare: false,
-    max: Number(process.env.DATABASE_POOL_MAX ?? (process.env.VERCEL ? 1 : 10)),
-    connect_timeout: Number(process.env.DATABASE_CONNECT_TIMEOUT_S ?? 10),
+    // Keep pools small on serverless (many instances × pool ≤ pooler limit).
+    max: Number(process.env.DATABASE_POOL_MAX || (process.env.VERCEL ? 1 : 10)),
+    connect_timeout: Number(process.env.DATABASE_CONNECT_TIMEOUT_S || 10),
     idle_timeout: 20,
     max_lifetime: 60 * 30,
     connection: {
-      statement_timeout: Number(process.env.DATABASE_STATEMENT_TIMEOUT_MS ?? 15000),
+      statement_timeout: Number(process.env.DATABASE_STATEMENT_TIMEOUT_MS || 15000),
       application_name: "no-competition-community",
     },
     onnotice: () => {},

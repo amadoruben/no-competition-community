@@ -11,9 +11,18 @@ export async function register() {
   config();
   const auto = process.env.DB_AUTO_MIGRATE ?? (process.env.NODE_ENV === "production" ? "0" : "1");
   if (auto === "1") {
-    const { dbHandle } = await import("./db");
+    const { dbHandle, openDatabase } = await import("./db");
     const { runMigrations } = await import("./db/migrate");
-    await runMigrations(dbHandle());
+    // Prefer a dedicated direct/session connection for DDL when provided.
+    const direct = process.env.DATABASE_MIGRATION_URL;
+    if (direct) {
+      const h = openDatabase(direct);
+      try {
+        await runMigrations(h);
+      } finally {
+        await h.close();
+      }
+    } else await runMigrations(dbHandle());
   }
 }
 

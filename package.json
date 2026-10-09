@@ -17,7 +17,8 @@
     "db:export": "tsx --env-file-if-exists=.env.local scripts/db-export.ts",
     "db:import": "tsx --env-file-if-exists=.env.local scripts/db-import.ts",
     "db:verify": "tsx --env-file-if-exists=.env.local scripts/db-verify.ts",
-    "vercel-build": "npm run db:migrate && next build"
+    "vercel-build": "npm run db:migrate && next build",
+    "supabase:bootstrap": "tsx --env-file-if-exists=.env.local scripts/supabase-bootstrap.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "0.5.8",
@@ -49,6 +50,6 @@
     "vitest": "^5.0.3"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22.12"
   }
 }
