@@ -5,8 +5,7 @@ import { useState } from "react";
 import type { ActionState } from "@/lib/action-state";
 import { PRIZE_KIND_LABEL } from "@/lib/labels";
 import { ActionForm, controlClass, Field, Input, SubmitButton, Textarea, useFormState } from "./form";
-import { ChallengeCover } from "./domain";
-import { cx } from "./ui";
+import { ChallengeCover, cx } from "./ui";
 
 type Crit = { id?: string; name: string; description: string; weight: number };
 type Prize = { id?: string; rank: number | null; title: string; description: string; value: string; kind: "prize" | "investment" | "recognition" };

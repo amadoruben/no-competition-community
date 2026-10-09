@@ -2,12 +2,13 @@ import { CalendarClock, MessageCircle, Pin, Users } from "lucide-react";
 import Link from "next/link";
 import type { ChallengeCard as ChallengeCardData } from "@/server/challenges";
 import type { FeedItem } from "@/server/community";
-import { POST_KIND_LABEL } from "@/server/community";
 import { challengePhase, PHASE_LABEL, type ChallengePhase } from "@/lib/challenge-state";
 import { deadlineText, fmtDay, timeAgo } from "@/lib/format";
-import { PHASE_TONE, ROLE_LABEL, STAGE_LABEL } from "@/lib/labels";
+import { PHASE_TONE, POST_KIND_LABEL, ROLE_LABEL, STAGE_LABEL } from "@/lib/labels";
 import type { Project, ProjectStage, Role } from "@/db/schema";
-import { Avatar, Badge, Card, cx, ProjectLogo, type Tone } from "./ui";
+import { Avatar, Badge, Card, ChallengeCover, cx, ProjectLogo, type Tone } from "./ui";
+
+export { ChallengeCover };
 import { ReactionButton } from "./reaction-button";
 
 export function PhaseBadge({ phase }: { phase: ChallengePhase }) {
@@ -29,14 +30,6 @@ export function phaseTimeline(c: { startsAt: Date; submissionDeadline: Date; res
   if (phase === "results") return "Resultados disponíveis";
   if (phase === "paused") return "Temporariamente em pausa";
   return "Não publicado";
-}
-
-export function ChallengeCover({ hue, className, children }: { hue: number; className?: string; children?: React.ReactNode }) {
-  return (
-    <div className={cx("cover relative overflow-hidden", className)} style={{ ["--h" as string]: hue }}>
-      {children}
-    </div>
-  );
 }
 
 export function ChallengeCard({ c, href }: { c: ChallengeCardData; href?: string }) {

@@ -1,5 +1,6 @@
 import { AppNav } from "@/components/app-nav";
 import { Brand } from "@/components/brand";
+import { Toaster } from "@/components/toaster";
 import { UserMenu } from "@/components/user-menu";
 import { ROLE_LABEL } from "@/lib/labels";
 import { requireUser } from "@/server/session";
@@ -29,6 +30,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       <footer className="border-t border-line py-6 text-center text-[12px] text-faint">
         No Competition Community · Dados de demonstração fictícios
       </footer>
+      <Toaster />
     </div>
   );
 }

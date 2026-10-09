@@ -254,3 +254,12 @@ export function Notice({ tone = "info", children, className }: { tone?: "info" |
     </div>
   );
 }
+
+/** Generated cover art for a challenge, from its hue. */
+export function ChallengeCover({ hue, className, children }: { hue: number; className?: string; children?: ReactNode }) {
+  return (
+    <div className={clsx("cover relative overflow-hidden", className)} style={{ ["--h" as string]: hue }}>
+      {children}
+    </div>
+  );
+}

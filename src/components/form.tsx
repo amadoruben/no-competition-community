@@ -4,6 +4,7 @@ import clsx from "clsx";
 import { Check, LoaderCircle } from "lucide-react";
 import { createContext, startTransition, useActionState, useContext, useEffect, useRef, type ComponentProps, type ReactNode } from "react";
 import type { ActionState } from "@/lib/action-state";
+import { toast } from "./toaster";
 import { buttonClass } from "./ui";
 
 const FormCtx = createContext<{ state: ActionState; pending: boolean }>({ state: null, pending: false });
@@ -28,7 +29,13 @@ export function ActionForm({
   onSuccess?: () => void;
   showMessages?: boolean;
 } & Omit<ComponentProps<"form">, "action" | "onSubmit">) {
-  const [state, dispatch, pending] = useActionState(action, null);
+  // Toast from inside the action so it fires even if this form unmounts when
+  // the page re-renders into its next state (e.g. "enrol" → "enrolled").
+  const [state, dispatch, pending] = useActionState(async (prev: ActionState, fd: FormData) => {
+    const r = await action(prev, fd);
+    if (r?.ok && r.message) toast(r.message);
+    return r;
+  }, null);
   const ref = useRef<HTMLFormElement>(null);
   const lastAt = useRef<number | undefined>(undefined);
 
@@ -73,8 +80,7 @@ export function useFormState() {
 
 export function FormMessage({ className }: { className?: string }) {
   const { state } = useFormState();
-  if (!state) return null;
-  if (state.ok && !state.message) return null;
+  if (!state || state.ok) return null;
   return (
     <p
       role={state.ok ? "status" : "alert"}

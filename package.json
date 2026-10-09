@@ -9,10 +9,12 @@
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "playwright test",
+    "test:e2e": "next build && playwright test",
     "db:generate": "drizzle-kit generate",
     "db:seed": "tsx src/db/seed.ts",
-    "setup": "npm run db:seed"
+    "setup": "npm run db:seed",
+    "predev": "tsx src/db/seed.ts --if-empty",
+    "prestart": "tsx src/db/seed.ts --if-empty"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
@@ -40,5 +42,8 @@
     "tsx": "^4.23.15",
     "typescript": "^5",
     "vitest": "^5.0.3"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

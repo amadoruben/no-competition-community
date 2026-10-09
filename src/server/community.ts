@@ -6,12 +6,7 @@ import { forbidden, notFound } from "./errors";
 import { isInvestor, isProjectMember } from "./permissions";
 import { parse, text } from "./validation";
 
-export const POST_KIND_LABEL: Record<PostKind, string> = {
-  announcement: "Anúncio",
-  discussion: "Discussão",
-  progress: "Progresso",
-  question: "Pergunta",
-};
+export { POST_KIND_LABEL } from "@/lib/labels";
 
 function postQuery(viewerId: string) {
   return db

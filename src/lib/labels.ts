@@ -1,4 +1,4 @@
-import type { OpportunityStatus, PrizeKind, ProjectStage, Role, SubmissionStatus } from "@/db/schema";
+import type { OpportunityStatus, PostKind, PrizeKind, ProjectStage, Role, SubmissionStatus } from "@/db/schema";
 import type { ChallengePhase } from "./challenge-state";
 import type { Tone } from "@/components/ui";
 
@@ -52,3 +52,10 @@ export const OPPORTUNITY_TONE: Record<OpportunityStatus, Tone> = {
 };
 
 export const ordinal = (n: number) => `${n}.º`;
+
+export const POST_KIND_LABEL: Record<PostKind, string> = {
+  announcement: "Anúncio",
+  discussion: "Discussão",
+  progress: "Progresso",
+  question: "Pergunta",
+};
