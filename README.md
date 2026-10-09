@@ -19,7 +19,7 @@ cp .env.example .env.local
 npm run dev          # aplica migrações e, se a base estiver vazia, carrega a demonstração
 ```
 
-`npm run db:seed` repõe os dados de demonstração. Contas (palavra-passe `demo1234`, botões de um clique em `/login` quando `DEMO_MODE=1`):
+`npm run db:seed` repõe os dados de demonstração. Contas (palavra-passe `demo1234`, botões de um clique em `/login` e `/demo` quando `DEMO_MODE=1`):
 
 | Papel | Email |
 |---|---|
@@ -28,6 +28,8 @@ npm run dev          # aplica migrações e, se a base estiver vazia, carrega a 
 | Membro | `membro@demo.ncc` |
 
 ### Guião de demonstração (≈5 min)
+
+A página pública **`/demo`** (visita guiada) tem estes passos com um botão que entra directamente no ecrã certo com o papel certo. Fora do modo de demonstração mostra só a descrição.
 
 1. **Investidora → Painel**: próxima acção de cada desafio, submissões por desafio, pipeline e decisões recentes.
 2. Abrir *Finanças simples para independentes* → **Submissões** (ordenáveis) → **Comparar** → avaliar a *Conta Fácil*.
@@ -69,4 +71,8 @@ CI (`.github/workflows/ci.yml`): lint, tipos, testes em PGlite e PostgreSQL 16, 
 
 **Infra-estrutura:** PostgreSQL (Supabase ou outro) via Drizzle; Auth e Storage atrás de interfaces próprias com implementações local e Supabase; exportação/restauro verificáveis; health check; logs estruturados; Docker para alojamento fora da Vercel.
 
-**Pendente de acções externas:** criação do projecto Supabase e do projecto Vercel, variáveis de ambiente e secrets de backup (ver `docs/OPERATIONS.md` §2 e §4). O adaptador Supabase Auth/Storage foi testado contra uma simulação da API HTTP, não contra um projecto real.
+**Apresentação:** landing com proposta de valor por papel, visita guiada `/demo`, dados fictícios assinalados (só em modo de demonstração). A landing, `/demo` e `/login` abrem mesmo sem base de dados.
+
+**Email:** Supabase Auth envia confirmação e recuperação pelo SMTP configurado no Supabase; a app suporta `SMTP_URL`/`EMAIL_WEBHOOK_URL` para auth local (`docs/OPERATIONS.md` §8).
+
+**Pendente de acções externas:** projecto Supabase acessível e variáveis de ambiente na Vercel, SMTP no Supabase, secrets de backup (ver `docs/OPERATIONS.md` §2, §4 e §8). O adaptador Supabase Auth/Storage foi testado contra uma simulação da API HTTP, não contra um projecto real. A Vercel já faz build deste repositório (previews por branch).

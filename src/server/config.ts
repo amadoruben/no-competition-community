@@ -27,6 +27,8 @@ const schema = z
       ctx.addIssue({ code: "custom", path: ["SUPABASE_SERVICE_ROLE_KEY"], message: "required by STORAGE_PROVIDER=supabase" });
     if (process.env.VERCEL && v.STORAGE_PROVIDER === "local")
       ctx.addIssue({ code: "custom", path: ["STORAGE_PROVIDER"], message: "local storage is not persistent on Vercel; use supabase" });
+    if (process.env.VERCEL_ENV === "production" && !process.env.APP_ENV)
+      ctx.addIssue({ code: "custom", path: ["APP_ENV"], message: "must be set explicitly on a production deployment" });
     if (process.env.VERCEL && v.DATABASE_URL.startsWith("pglite://"))
       ctx.addIssue({ code: "custom", path: ["DATABASE_URL"], message: "embedded PGlite is not persistent on Vercel; use a PostgreSQL URL" });
   });
@@ -57,5 +59,6 @@ export function config(): Config {
 export function demoMode() {
   const flag = process.env.DEMO_MODE;
   if (flag === "1" || flag === "0") return flag === "1";
+  if (process.env.VERCEL_ENV === "production") return false;
   return (process.env.APP_ENV ?? "development") !== "production";
 }

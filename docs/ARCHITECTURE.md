@@ -97,6 +97,7 @@ Interface `StorageProvider` (put/get/delete/signedUrl). A BD guarda só uma **ch
 | @supabase/supabase-js / @supabase/ssr | 2.117.1 / 0.12.7 |
 | zod | 4.6.5 |
 | bcryptjs | 3.0.3 |
+| nodemailer | 10.0.10 (fixada; só auth local) |
 | Vitest / Playwright | 5.0.3 / 1.64.0 |
 | PostgreSQL de teste | 16.15 (local, CI) · PGlite 0.5.8 |
 

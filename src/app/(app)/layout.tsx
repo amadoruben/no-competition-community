@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { AppNav, MobileNav } from "@/components/app-nav";
 import { Brand } from "@/components/brand";
 import { Toaster } from "@/components/toaster";
@@ -19,9 +20,9 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
             {user.isDemo && (
-              <span className="hidden rounded-full bg-volt-soft px-2.5 py-1 text-[11px] font-semibold tracking-wide text-ink uppercase ring-1 ring-volt-strong/50 lg:inline">
-                Conta de demonstração
-              </span>
+              <Link href="/demo" className="hidden rounded-full bg-volt-soft px-2.5 py-1 text-[11px] font-semibold tracking-wide text-ink uppercase ring-1 ring-volt-strong/50 hover:bg-volt lg:inline" title="Abrir a visita guiada">
+                Demonstração · guia
+              </Link>
             )}
             <UserMenu name={user.name} handle={user.handle} hue={user.avatarHue} fileId={user.avatarFileId} roleLabel={ROLE_LABEL[user.role]} />
           </div>

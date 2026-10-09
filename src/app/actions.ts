@@ -68,7 +68,8 @@ async function origin() {
 }
 
 function safeNext(next: string) {
-  return next.startsWith("/") && !next.startsWith("//") ? next : null;
+  // Same-origin paths only: "//host" and "/\\host" are treated as external by browsers.
+  return /^\/(?![\/\\])/.test(next) ? next : null;
 }
 
 // Auth -------------------------------------------------------------------------
@@ -101,7 +102,7 @@ export async function demoLoginAction(fd: FormData) {
     logger.error("auth.demo_login_failed", { error: e });
     redirect("/login?error=demo");
   }
-  redirect(homeFor(user));
+  redirect(safeNext(str(fd, "next")) ?? homeFor(user));
 }
 
 export async function registerAction(_: ActionState, fd: FormData): Promise<ActionState> {

@@ -22,11 +22,19 @@ Pré-requisitos que dependem do titular das contas: projecto Supabase dedicado (
    - *Transaction pooler* (porta 6543) → `DATABASE_URL`
    - *Session pooler* (porta 5432) → `DATABASE_MIGRATION_URL` (a Vercel é IPv4; a ligação directa é IPv6 sem o add-on)
 2. **Supabase → API keys**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (secreta).
-3. **Supabase → Auth → URL Configuration**: Site URL = domínio da app; adicionar `https://<domínio>/reset-password` aos Redirect URLs.
+3. **Supabase → Auth → URL Configuration**: Site URL = domínio da app; Redirect URLs:
+   - `https://<domínio>/auth/callback` (confirmação de email no registo)
+   - `https://<domínio>/reset-password` (recuperação de palavra-passe)
+   - para previews da Vercel, o padrão com wildcard `https://*-<conta>.vercel.app/**` — só no projecto Supabase de preview/demo, nunca no de produção.
 4. Localmente, com essas variáveis: `npm run supabase:bootstrap` (cria o bucket privado) e, só para demo, `APP_ENV=demo npm run db:seed`.
-5. **Vercel → Environment Variables** (por ambiente): todas as anteriores + `APP_ENV`, `AUTH_PROVIDER=supabase`, `STORAGE_PROVIDER=supabase`, `APP_URL`, `DEMO_MODE`.
-6. Deploy. O script `vercel-build` aplica migrações (`db:migrate`, idempotente, com lock) e depois faz o build. Verificar `https://<domínio>/api/health` → `200`.
+5. **Vercel → Environment Variables** (por ambiente — *Production* e *Preview* com projectos Supabase diferentes): todas as anteriores + `APP_ENV`, `AUTH_PROVIDER=supabase`, `STORAGE_PROVIDER=supabase`, `APP_URL`, `DEMO_MODE`. Num deploy de produção da Vercel, `APP_ENV` é obrigatório (a validação recusa o valor por omissão) e o acesso de demonstração fica desligado salvo `DEMO_MODE=1` explícito.
+6. Deploy (push para a branch; `vercel.json` fixa o preset Next.js e o comando `npm run vercel-build`). O build aplica migrações (`db:migrate`, idempotente, com lock) quando `DATABASE_URL` existe; sem ela o build passa e a app arranca em modo "não configurado". Verificar `https://<domínio>/api/health` → `200`. Em `503`, o JSON lista **os nomes** das variáveis em falta (nunca valores).
 7. Correr o *advisor* de segurança do Supabase: não deve haver tabelas sem RLS.
+8. **Email (obrigatório antes de abrir registos ao público):** configurar SMTP próprio no Supabase (§8).
+
+**Região:** a função Vercel corre por omissão em `iad1` (EUA-Leste, confirmado nos cabeçalhos do preview). Escolher o projecto Supabase na mesma região, ou mudar a região da função em *Vercel → Settings → Functions* para a do Supabase: cada pedido faz várias consultas e a latência entre continentes multiplica-se.
+
+**Protecção de deployments:** a Vercel protege por omissão os URLs `*.vercel.app` com *Vercel Authentication*. Para uma demonstração pública: (a) domínio próprio para produção/demo, que não é afectado, ou (b) desligar a protecção só para Preview em *Settings → Deployment Protection*. É uma decisão do titular da conta.
 
 ## 3. Migrações
 
@@ -115,3 +123,32 @@ Não há base de dados secundária activa nem failover automático (sem necessid
 - `DEMO_MODE=0` em produção (desliga o acesso de um clique).
 - Contas de demonstração (`*@demo.ncc`, palavra-passe `demo1234`) só em ambientes de demo.
 - Cabeçalhos: HSTS, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`.
+
+## 8. Email transaccional
+
+Quem envia o quê:
+
+| Email | Com `AUTH_PROVIDER=supabase` | Com `AUTH_PROVIDER=local` |
+|---|---|---|
+| Confirmação de registo, recuperação de palavra-passe | Supabase Auth, pelo SMTP configurado no Supabase | a aplicação (`src/server/mail.ts`) via `SMTP_URL` ou `EMAIL_WEBHOOK_URL` |
+
+**O SMTP por omissão do Supabase não serve para produção** (documentação Supabase, *Auth → SMTP*): só entrega a endereços da equipa da organização ("Email address not authorized" para os restantes), com limite horário baixo e sem SLA. Com SMTP próprio, o limite inicial é 30 emails/hora — ajustar em *Auth → Rate Limits*.
+
+Configuração: *Supabase → Authentication → Emails → SMTP Settings* (host, porta, utilizador, palavra-passe, remetente). As credenciais ficam no Supabase; não entram no repositório nem na Vercel.
+
+### Opções
+
+| Opção | Adequado para | Limitações |
+|---|---|---|
+| **Conta Gmail da NCC** (`smtp.gmail.com`, porta 465, *App Password*) | demonstração e piloto com poucos utilizadores | exige verificação em 2 passos; o *App Password* é revogado se a palavra-passe da conta mudar; limite ≈500 emails/dia numa conta pessoal (2 000 em Google Workspace); remetente `@gmail.com` tem pior entregabilidade e não permite SPF/DKIM do domínio próprio; a Google desaconselha *App Passwords* |
+| **Fornecedor transaccional** (Resend, Postmark, Amazon SES, Brevo…) com domínio próprio | produção | requer domínio e registos DNS (SPF, DKIM, DMARC); planos gratuitos com limites próprios |
+
+Recomendação: Gmail apenas para a demonstração; antes de produção, domínio próprio + fornecedor transaccional. A conta Gmail continua útil como endereço de contacto e de `Reply-To`.
+
+Passos com Gmail (feitos pelo titular da conta, nunca em código):
+1. Conta Google → Segurança → activar verificação em 2 passos.
+2. Conta Google → *App passwords* → criar uma para "Supabase NCC".
+3. Supabase → SMTP Settings: host `smtp.gmail.com`, porta `465`, utilizador = endereço Gmail, palavra-passe = *App Password*, remetente = o mesmo endereço.
+4. Testar: registar uma conta com um endereço externo à equipa e pedir recuperação de palavra-passe; os links devem abrir `/auth/callback` e `/reset-password` no domínio certo.
+
+Com auth local, o equivalente é `SMTP_URL=smtps://<utilizador>%40gmail.com:<app-password>@smtp.gmail.com:465` como variável **secreta** do ambiente (testado contra um servidor SMTP em `src/server/__tests__/mail.test.ts`; os logs nunca incluem o URL).

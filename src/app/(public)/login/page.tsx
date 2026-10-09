@@ -44,7 +44,10 @@ export default async function LoginPage(props: PageProps<"/login">) {
       {demo && (
       <>
       <div className="space-y-2">
-        <p className="text-[13px] font-medium text-muted">Entrar com um clique</p>
+        <div className="flex items-baseline justify-between">
+          <p className="text-[13px] font-medium text-muted">Entrar com um clique</p>
+          <Link href="/demo" className="text-[13px] font-medium underline-offset-4 hover:underline">Visita guiada →</Link>
+        </div>
         {demos.map(({ email, icon: Icon, title, who, body }) => (
           <form key={email} action={demoLoginAction}>
             <input type="hidden" name="email" value={email} />

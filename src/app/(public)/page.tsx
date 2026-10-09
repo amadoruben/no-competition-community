@@ -1,10 +1,12 @@
-import { ArrowRight, Check, Gavel, LineChart, ScrollText, Scale } from "lucide-react";
+import { ArrowRight, Check, ClipboardCheck, Gauge, Gavel, LineChart, Rocket, ScrollText, Scale } from "lucide-react";
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { redirect, unstable_rethrow } from "next/navigation";
 import { Brand } from "@/components/brand";
 import { ChallengeCover, PhaseBadge, phaseTimeline } from "@/components/domain";
 import { ButtonLink } from "@/components/ui";
+import { demoMode } from "@/server/config";
 import { publicOverview } from "@/server/challenges";
+import { logger } from "@/server/logger";
 import { currentUser, homeFor } from "@/server/session";
 
 const steps = [
@@ -14,6 +16,31 @@ const steps = [
   { n: "04", title: "Resultados e oportunidades", body: "Vencedores publicados, rankings actualizados. O investimento é uma decisão separada." },
 ];
 
+const audiences = [
+  {
+    icon: Gauge,
+    who: "Para investidores",
+    title: "Encontre equipas antes do mercado.",
+    points: [
+      "Lance desafios com critérios e prémios públicos",
+      "Compare projectos por critério, lado a lado",
+      "Decida com histórico auditável e pipeline de investimento separado",
+    ],
+  },
+  {
+    icon: Rocket,
+    who: "Para membros",
+    title: "Construa com prazo, critério e feedback.",
+    points: ["Descubra desafios e submeta o seu projecto", "Receba notas por critério e feedback escrito", "Ganhe reconhecimento por mérito, não por popularidade"],
+  },
+  {
+    icon: ClipboardCheck,
+    who: "Para avaliadores",
+    title: "Avalie com foco e independência.",
+    points: ["Veja apenas os trabalhos atribuídos", "Pontue cada critério de 0 a 10 com nota ponderada automática", "As suas notas ficam privadas até à publicação"],
+  },
+];
+
 const principles = [
   { icon: Scale, title: "Critérios antes da competição", body: "Pesos e regras definidos e visíveis antes de qualquer submissão." },
   { icon: LineChart, title: "Mérito não é popularidade", body: "Reacções não dão pontos. O mérito vem apenas de resultados avaliados." },
@@ -21,10 +48,22 @@ const principles = [
   { icon: ScrollText, title: "Decisões com histórico", body: "Publicações, encerramentos e resultados ficam registados e auditáveis." },
 ];
 
+/** The marketing page must render even when the database is unreachable or not yet configured. */
+async function liveData() {
+  try {
+    const [user, overview] = await Promise.all([currentUser(), publicOverview()]);
+    return { user, ...overview };
+  } catch (error) {
+    unstable_rethrow(error);
+    logger.warn("landing.live_data_unavailable", { error });
+    return { user: null, challenges: [], stats: null };
+  }
+}
+
 export default async function Landing() {
-  const user = await currentUser();
+  const { user, challenges, stats } = await liveData();
   if (user) redirect(homeFor(user));
-  const { challenges, stats } = await publicOverview();
+  const demo = demoMode();
 
   return (
     <div className="bg-paper">
@@ -45,9 +84,11 @@ export default async function Landing() {
           </div>
           <div className="grid gap-10 pt-14 pb-20 lg:grid-cols-[1.25fr_1fr] lg:items-end lg:pt-24 lg:pb-28">
             <div>
-              <p className="mb-5 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[13px] text-white/80">
-                <span className="size-1.5 rounded-full bg-volt" /> {stats.challenges} desafios · {stats.projects} projectos na comunidade
-              </p>
+              {stats && (
+                <p className="mb-5 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[13px] text-white/80">
+                  <span className="size-1.5 rounded-full bg-volt" /> {stats.challenges} desafios · {stats.projects} projectos na comunidade
+                </p>
+              )}
               <h1 className="font-display text-[44px] leading-[1.02] font-semibold sm:text-[64px] lg:text-[76px]">
                 Construa algo que <span className="text-volt">não tem concorrência.</span>
               </h1>
@@ -55,28 +96,55 @@ export default async function Landing() {
                 A comunidade onde um investidor lança desafios reais e as melhores equipas constroem, submetem e são avaliadas com critérios públicos.
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
-                <ButtonLink href="/login" variant="accent" size="lg">
-                  Explorar a demonstração <ArrowRight className="size-4" />
+                <ButtonLink href={demo ? "/demo" : "/login"} variant="accent" size="lg">
+                  {demo ? "Explorar a demonstração" : "Entrar"} <ArrowRight className="size-4" />
                 </ButtonLink>
                 <ButtonLink href="/register" size="lg" className="bg-white/10 text-white hover:bg-white/20">
                   Juntar-me à comunidade
                 </ButtonLink>
               </div>
             </div>
-            <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl bg-white/10 ring-1 ring-white/10">
-              {[
-                ["Desafios", stats.challenges],
-                ["Projectos", stats.projects],
-                ["Membros", stats.members],
-                ["Submissões", stats.submissions],
-              ].map(([k, v]) => (
-                <div key={k} className="bg-ink/60 p-5 backdrop-blur">
-                  <dt className="text-[12px] tracking-wide text-white/50 uppercase">{k}</dt>
-                  <dd className="tabular mt-1 font-display text-4xl font-semibold">{v}</dd>
-                </div>
-              ))}
-            </dl>
+            {stats && (
+              <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl bg-white/10 ring-1 ring-white/10">
+                {[
+                  ["Desafios", stats.challenges],
+                  ["Projectos", stats.projects],
+                  ["Membros", stats.members],
+                  ["Submissões", stats.submissions],
+                ].map(([k, v]) => (
+                  <div key={k} className="bg-ink/60 p-5 backdrop-blur">
+                    <dt className="text-[12px] tracking-wide text-white/50 uppercase">{k}</dt>
+                    <dd className="tabular mt-1 font-display text-4xl font-semibold">{v}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
           </div>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-[1200px] px-4 pt-16 sm:px-6 sm:pt-20">
+        <h2 className="font-display text-3xl font-semibold sm:text-4xl">Uma plataforma, três papéis</h2>
+        <div className="mt-8 grid gap-4 lg:grid-cols-3">
+          {audiences.map(({ icon: Icon, who, title, points }) => (
+            <div key={who} className="flex flex-col rounded-2xl bg-surface p-6 ring-1 ring-line">
+              <div className="flex items-center gap-2 text-[13px] font-semibold text-muted">
+                <span className="grid size-8 place-items-center rounded-lg bg-volt-soft text-ink ring-1 ring-volt-strong/40">
+                  <Icon className="size-4" />
+                </span>
+                {who}
+              </div>
+              <h3 className="mt-4 font-display text-xl font-semibold">{title}</h3>
+              <ul className="mt-4 space-y-2 text-sm text-ink-2">
+                {points.map((p) => (
+                  <li key={p} className="flex gap-2">
+                    <Check className="mt-0.5 size-4 shrink-0 text-ok" />
+                    {p}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -146,7 +214,9 @@ export default async function Landing() {
 
       <section className="mx-auto max-w-[1200px] px-4 py-16 text-center sm:px-6">
         <h2 className="font-display text-3xl font-semibold sm:text-4xl">Veja a plataforma por dentro.</h2>
-        <p className="mx-auto mt-3 max-w-lg text-ink-2">Entre com uma conta de demonstração como investidora, avaliadora ou membro.</p>
+        <p className="mx-auto mt-3 max-w-lg text-ink-2">
+          {demo ? "Entre com uma conta de demonstração como investidora, avaliadora ou membro." : "Seis passos, do desafio publicado à decisão de investimento."}
+        </p>
         <ul className="mx-auto mt-6 flex max-w-xl flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-ink-2">
           {["Criar e publicar desafios", "Avaliar e comparar projectos", "Publicar resultados"].map((t) => (
             <li key={t} className="flex items-center gap-1.5">
@@ -154,12 +224,18 @@ export default async function Landing() {
             </li>
           ))}
         </ul>
-        <ButtonLink href="/login" size="lg" className="mt-8">
-          Entrar na demonstração <ArrowRight className="size-4" />
-        </ButtonLink>
+        <div className="mt-8 flex flex-wrap justify-center gap-3">
+          <ButtonLink href="/demo" size="lg">
+            Ver a visita guiada <ArrowRight className="size-4" />
+          </ButtonLink>
+          <ButtonLink href="/login" size="lg" variant="secondary">
+            Entrar
+          </ButtonLink>
+        </div>
       </section>
       <footer className="border-t border-line py-8 text-center text-[12px] text-muted">
-        © No Competition Community · Os dados apresentados são fictícios, para demonstração.
+        © No Competition Community
+        {demo && " · Os dados apresentados são fictícios, para demonstração."}
       </footer>
     </div>
   );
