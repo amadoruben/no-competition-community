@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
+import { secretKey, supabaseUrl } from "@/lib/supabase-env";
 import { credentials } from "@/db/schema";
 import { hashPassword } from "./passwords";
 import type { AuthIdentity } from "./types";
@@ -13,7 +14,7 @@ import type { AuthIdentity } from "./types";
 export async function provisionIdentity(email: string, password: string): Promise<AuthIdentity> {
   const key = email.trim().toLowerCase();
   if ((process.env.AUTH_PROVIDER ?? "local") === "supabase") {
-    const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+    const admin = createClient(supabaseUrl(process.env)!, secretKey(process.env)!, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
     const { data, error } = await admin.auth.admin.createUser({ email: key, password, email_confirm: true });

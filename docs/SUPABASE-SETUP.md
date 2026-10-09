@@ -12,17 +12,24 @@ A aplicação protege-se disto: `db:migrate`, `db:seed`, `db:import`, `user:role
 
 Dashboard do Supabase → projecto da NCC:
 
-| # | Variável | Onde | Secreto? |
+Todos os valores são **colados tal como o dashboard os mostra** — nada a editar ou montar.
+
+| # | Variável | Onde copiar | Secreto? |
 |---|---|---|---|
-| 1 | `DATABASE_URL` | botão **Connect** (topo) → **Transaction pooler** (porta **6543**) | **sim** |
-| 2 | `DATABASE_MIGRATION_URL` *(opcional)* | **Connect** → **Session pooler** (porta **5432**). Se ficar vazio, é derivado do valor 1 (mesmo host e utilizador, porta 5432) | **sim** |
-| 3 | `NEXT_PUBLIC_SUPABASE_URL` | **Project Settings → API Keys** → Project URL (`https://<ref>.supabase.co`) | não |
+| 1 | `DATABASE_URL` | botão **Connect** (topo) → copiar a *connection string* do **Transaction pooler** (ou do Session pooler), **com** `[YOUR-PASSWORD]` lá dentro | **sim** |
+| 2 | `SUPABASE_DB_PASSWORD` | a palavra-passe da base (**Project Settings → Database → Reset database password** se não a tiver) | **sim** |
+| 3 | `NEXT_PUBLIC_SUPABASE_URL` | **Project Settings → API Keys** → Project URL | não |
 | 4 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | **Project Settings → API Keys** → Publishable key (`sb_publishable_…`) | não |
-| 5 | `SUPABASE_SERVICE_ROLE_KEY` | **Project Settings → API Keys** → Secret keys (`sb_secret_…`) | **sim** |
+| 5 | `SUPABASE_SECRET_KEY` | **Project Settings → API Keys** → Secret keys (`sb_secret_…`) | **sim** |
 
-Nos URLs 1 e 2, substitua `[YOUR-PASSWORD]` pela palavra-passe da base de dados (**Project Settings → Database → Reset database password** se não a tiver). Caracteres especiais na palavra-passe têm de ser codificados (`@` → `%40`, `#` → `%23`, `/` → `%2F`); mais simples: gerar uma palavra-passe só com letras e números.
+O que a aplicação faz sozinha (`src/lib/supabase-env.ts`, testado):
+- põe a palavra-passe no lugar de `[YOUR-PASSWORD]`, codificada (qualquer carácter serve);
+- usa o *transaction pooler* (6543) na aplicação e o *session pooler* (5432, mesmo host e utilizador) nas migrações, seja qual for o dos dois que colar;
+- retira espaços, aspas, quebras de linha e parâmetros que o driver rejeitaria (ex.: `pgbouncer=true`); reduz o Project URL à origem (ignora `/rest/v1/`);
+- exige TLS em todas as ligações ao Supabase;
+- aceita `SUPABASE_SERVICE_ROLE_KEY` (nome antigo) em vez de `SUPABASE_SECRET_KEY`, e `DATABASE_MIGRATION_URL` explícito se o quiser.
 
-Porquê dois URLs: a aplicação em serverless usa o *transaction pooler*; as migrações precisam de uma sessão (lock exclusivo), por isso usam o *session pooler*. Ambos funcionam em IPv4 (a Vercel é IPv4).
+A ligação *Direct connection* (`db.<ref>.supabase.co`) é só IPv6 e não funciona na Vercel: o diagnóstico avisa.
 
 ## 2. Configurar a autenticação no Supabase
 
@@ -77,18 +84,14 @@ Dados de demonstração **não** devem ir para um projecto que venha a ser de pr
 
 Vercel → projecto **no-competition-community** → **Settings → Environment Variables** → *Add*. Comece **só com o ambiente Preview** (a branch `main`/Production fica intocada até decidir).
 
-Já configurado (Preview, branch `claude/no-competition-mvp`): `NEXT_PUBLIC_SUPABASE_URL`, `APP_ENV=preview`, `AUTH_PROVIDER=supabase`, `STORAGE_PROVIDER=supabase`, `DEMO_MODE=0`. Faltam os **três** valores 1, 4 e 5 (o 2 é derivado automaticamente) — em *Environments* escolha **Preview** e, em *Branch*, `claude/no-competition-mvp`:
+Já configurado (Preview, branch `claude/no-competition-mvp`): `NEXT_PUBLIC_SUPABASE_URL`, `APP_ENV=preview`, `AUTH_PROVIDER=supabase`, `STORAGE_PROVIDER=supabase`, `DEMO_MODE=0`. Faltam os valores 1, 2, 4 e 5, cada um com *Environment* **Preview**, *Branch* `claude/no-competition-mvp` e **Sensitive** nos secretos:
 
-| Nome | Valor | Ambiente | *Sensitive* |
-|---|---|---|---|
-| `DATABASE_URL` | valor 1 | Preview | ✓ |
-| `NEXT_PUBLIC_SUPABASE_URL` | valor 3 | Preview | — |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | valor 4 | Preview | — |
-| `SUPABASE_SERVICE_ROLE_KEY` | valor 5 | Preview | ✓ |
-| `APP_ENV` | `preview` (ou `demo`) | Preview | — |
-| `AUTH_PROVIDER` | `supabase` | Preview | — |
-| `STORAGE_PROVIDER` | `supabase` | Preview | — |
-| `DEMO_MODE` | `0` (ou `1` se o projecto for só de demonstração) | Preview | — |
+| Nome (campo *Key*) | Valor (campo *Value*) | *Sensitive* |
+|---|---|---|
+| `DATABASE_URL` | valor 1, colado tal como está | ✓ |
+| `SUPABASE_DB_PASSWORD` | valor 2 | ✓ |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | valor 4 | — |
+| `SUPABASE_SECRET_KEY` | valor 5 | ✓ |
 
 `APP_URL` fica vazio em Preview (cada preview tem o seu endereço; a app usa o do pedido). Em Production será o domínio final.
 

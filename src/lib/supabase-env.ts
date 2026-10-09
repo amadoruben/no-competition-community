@@ -36,20 +36,97 @@ export function inspectDbUrl(raw: string | undefined): DbUrlInfo | null {
   return { ref, host: u.hostname, port, kind };
 }
 
+/** Values pasted into dashboards often carry spaces, line breaks or quotes. */
+export function clean(v: string | undefined): string | undefined {
+  if (v == null) return undefined;
+  let s = v.trim();
+  if (s.length > 1 && (s[0] === '"' || s[0] === "'") && s.at(-1) === s[0]) s = s.slice(1, -1).trim();
+  return s === "" ? undefined : s;
+}
+
+/** Project URL reduced to its origin: "https://<ref>.supabase.co/rest/v1/" → "https://<ref>.supabase.co". */
+export function supabaseUrl(env: Env): string | undefined {
+  const raw = clean(env.NEXT_PUBLIC_SUPABASE_URL);
+  if (!raw) return undefined;
+  try {
+    const u = new URL(raw);
+    return `${u.protocol}//${u.host}`;
+  } catch {
+    return raw;
+  }
+}
+
+export const publishableKey = (env: Env) => clean(env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
+/** The dashboard calls it "Secret key"; SUPABASE_SERVICE_ROLE_KEY is the older name, still accepted. */
+export const secretKey = (env: Env) => clean(env.SUPABASE_SECRET_KEY) ?? clean(env.SUPABASE_SERVICE_ROLE_KEY);
+export const SECRET_KEY_VAR = "SUPABASE_SECRET_KEY";
+
+const PASSWORD_PLACEHOLDER = /\[YOUR[-_]PASSWORD\]|%5BYOUR[-_]PASSWORD%5D/i;
+export const hasPasswordPlaceholder = (url: string | undefined) => !!url && PASSWORD_PLACEHOLDER.test(url);
+
+// Query parameters postgres.js understands; it would forward anything else (e.g. Prisma's
+// "pgbouncer=true" from the Connect dialog) to the server as a setting and fail.
+const DRIVER_PARAMS = new Set(["sslmode", "sslrootcert", "application_name", "options", "target_session_attrs"]);
+
 /**
- * URL for migrations (needs a session: advisory locks). An explicit
- * DATABASE_MIGRATION_URL wins; otherwise a Supabase shared-pooler URL in
- * transaction mode (…pooler.supabase.com:6543) maps to the same host and user in
- * session mode (port 5432), as documented by Supabase. Anything else is used as is.
+ * A connection string exactly as copied from Supabase → Connect, made usable:
+ * [YOUR-PASSWORD] is replaced by SUPABASE_DB_PASSWORD (URL-encoded, so any
+ * character works) and parameters the driver does not understand are dropped.
+ */
+function normaliseDbUrl(raw: string | undefined, password: string | undefined): string | undefined {
+  let s = clean(raw);
+  if (!s) return undefined;
+  if (password && hasPasswordPlaceholder(s)) s = s.replace(PASSWORD_PLACEHOLDER, encodeURIComponent(password));
+  let u: URL;
+  try {
+    u = new URL(s);
+  } catch {
+    return s;
+  }
+  if (!/^postgres(ql)?:$/.test(u.protocol)) return s;
+  for (const k of [...u.searchParams.keys()]) if (!DRIVER_PARAMS.has(k)) u.searchParams.delete(k);
+  return u.toString();
+}
+
+function withPort(url: string, port: string) {
+  const u = new URL(url);
+  u.port = port;
+  return u.toString();
+}
+
+const isSharedPooler = (url: string | undefined) => !!url && inspectDbUrl(url)?.host.endsWith(".pooler.supabase.com") === true;
+
+/**
+ * Runtime connection. Any Supabase pooler string works: a session-pooler string
+ * (port 5432) is switched to transaction mode (6543, same host and user), which
+ * serverless functions need.
+ */
+export function databaseUrlFrom(env: Env): string | undefined {
+  const url = normaliseDbUrl(env.DATABASE_URL, clean(env.SUPABASE_DB_PASSWORD));
+  return url && isSharedPooler(url) && inspectDbUrl(url)?.port === 5432 ? withPort(url, "6543") : url;
+}
+
+/**
+ * Migration connection (needs a session: advisory locks). An explicit
+ * DATABASE_MIGRATION_URL wins; otherwise the shared pooler's session mode on the
+ * same host and user (port 5432), as documented by Supabase. Anything else is used as is.
  */
 export function migrationDatabaseUrl(env: Env): string | undefined {
-  if (env.DATABASE_MIGRATION_URL) return env.DATABASE_MIGRATION_URL;
-  const raw = env.DATABASE_URL;
-  const info = inspectDbUrl(raw);
-  if (!raw || !info || info.kind !== "transaction-pooler" || !info.host.endsWith(".pooler.supabase.com")) return raw;
-  const u = new URL(raw);
-  u.port = "5432";
-  return u.toString();
+  const explicit = normaliseDbUrl(env.DATABASE_MIGRATION_URL, clean(env.SUPABASE_DB_PASSWORD));
+  if (explicit) return explicit;
+  const runtime = databaseUrlFrom(env);
+  return runtime && isSharedPooler(runtime) ? withPort(runtime, "5432") : runtime;
+}
+
+/** Supabase accepts TLS on every endpoint; require it unless the URL says otherwise. */
+export function sslFor(url: string): "require" | undefined {
+  try {
+    const u = new URL(url);
+    if (u.searchParams.has("sslmode")) return undefined;
+    return /\.supabase\.(co|com)$/.test(u.hostname) ? "require" : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 type KeyInfo = { kind: "publishable" | "secret" | "anon-jwt" | "service-role-jwt" | "unknown"; ref: string | null };
@@ -75,8 +152,9 @@ export function analyseSupabaseEnv(env: Env): { ref: string | null; findings: Fi
   const f: Finding[] = [];
   const add = (level: Finding["level"], message: string) => f.push({ level, message });
 
-  const ref = projectRefFromUrl(env.NEXT_PUBLIC_SUPABASE_URL);
-  if (!env.NEXT_PUBLIC_SUPABASE_URL) add("error", "NEXT_PUBLIC_SUPABASE_URL is empty (Supabase → Project Settings → API → Project URL).");
+  const projectUrl = supabaseUrl(env);
+  const ref = projectRefFromUrl(projectUrl);
+  if (!projectUrl) add("error", "NEXT_PUBLIC_SUPABASE_URL is empty (Supabase → Project Settings → API Keys → Project URL).");
   else if (!ref) add("error", "NEXT_PUBLIC_SUPABASE_URL should look like https://<20-character ref>.supabase.co");
   else add("ok", `Project ref from NEXT_PUBLIC_SUPABASE_URL: ${ref}`);
 
@@ -84,30 +162,34 @@ export function analyseSupabaseEnv(env: Env): { ref: string | null; findings: Fi
     if (env[name] !== "supabase") add("warn", `${name} is "${env[name] ?? "local"}"; set it to "supabase" to use the Supabase project.`);
   }
 
-  const run = inspectDbUrl(env.DATABASE_URL);
-  if (!env.DATABASE_URL) add("error", "DATABASE_URL is empty (Connect → Transaction pooler, port 6543).");
-  else if (!run) add("error", "DATABASE_URL is not a postgres:// URL.");
+  const pasted = clean(env.DATABASE_URL);
+  const runtimeUrl = databaseUrlFrom(env);
+  const run = inspectDbUrl(runtimeUrl);
+  if (!pasted) add("error", "DATABASE_URL is empty (Supabase → Connect → copy the connection string as shown).");
+  else if (hasPasswordPlaceholder(runtimeUrl)) add("error", "DATABASE_URL contains [YOUR-PASSWORD]: add SUPABASE_DB_PASSWORD with the database password (it is inserted automatically).");
+  else if (!run) add("error", "DATABASE_URL is not a postgres:// connection string.");
   else {
-    if (run.kind !== "transaction-pooler") add("warn", `DATABASE_URL is a ${run.kind} connection (${run.host}:${run.port}); serverless hosting needs the transaction pooler (port 6543).`);
-    else add("ok", `DATABASE_URL: transaction pooler ${run.host}:${run.port}`);
+    if (hasPasswordPlaceholder(pasted)) add("ok", "Database password taken from SUPABASE_DB_PASSWORD");
+    if (inspectDbUrl(normaliseDbUrl(pasted, undefined))?.kind === "session-pooler") add("ok", "Session-pooler string switched to transaction mode (port 6543) for the app");
+    if (run.kind === "direct")
+      add("warn", `DATABASE_URL is the direct connection (${run.host}); it is IPv6-only and unreachable from Vercel. Copy the "Transaction pooler" string instead.`);
+    else if (run.kind === "other") add("ok", `DATABASE_URL: ${run.host}:${run.port}`);
+    else add("ok", `DATABASE_URL: transaction pooler ${run.host}:${run.port}${sslFor(runtimeUrl!) ? " (TLS required)" : ""}`);
     if (ref && run.ref && run.ref !== ref) add("error", `DATABASE_URL belongs to project ${run.ref}, but NEXT_PUBLIC_SUPABASE_URL is project ${ref}.`);
-    if (/\[YOUR-PASSWORD\]|YOUR-PASSWORD/i.test(env.DATABASE_URL)) add("error", "DATABASE_URL still contains the [YOUR-PASSWORD] placeholder.");
   }
 
-  const derived = !env.DATABASE_MIGRATION_URL && migrationDatabaseUrl(env) !== env.DATABASE_URL;
-  const mig = inspectDbUrl(migrationDatabaseUrl(env));
-  if (!env.DATABASE_MIGRATION_URL && !derived)
-    add("warn", "DATABASE_MIGRATION_URL is empty; migrations will use DATABASE_URL (advisory locks need a session connection: Connect → Session pooler, port 5432).");
-  else if (derived && mig) add("ok", `DATABASE_MIGRATION_URL derived from DATABASE_URL: session pooler ${mig.host}:${mig.port}`);
-  else if (!mig) add("error", "DATABASE_MIGRATION_URL is not a postgres:// URL.");
-  else {
-    if (mig.kind === "transaction-pooler") add("error", "DATABASE_MIGRATION_URL uses the transaction pooler; use the session pooler (port 5432) or the direct connection.");
+  const migUrl = migrationDatabaseUrl(env);
+  const mig = inspectDbUrl(migUrl);
+  if (clean(env.DATABASE_MIGRATION_URL)) {
+    if (hasPasswordPlaceholder(migUrl)) add("error", "DATABASE_MIGRATION_URL contains [YOUR-PASSWORD]: add SUPABASE_DB_PASSWORD.");
+    else if (!mig) add("error", "DATABASE_MIGRATION_URL is not a postgres:// connection string.");
+    else if (mig.kind === "transaction-pooler") add("error", "DATABASE_MIGRATION_URL uses the transaction pooler; leave it empty (it is derived) or use the session pooler.");
     else add("ok", `DATABASE_MIGRATION_URL: ${mig.kind} ${mig.host}:${mig.port}`);
-    if (ref && mig.ref && mig.ref !== ref) add("error", `DATABASE_MIGRATION_URL belongs to project ${mig.ref}, but NEXT_PUBLIC_SUPABASE_URL is project ${ref}.`);
-    if (/YOUR-PASSWORD/i.test(env.DATABASE_MIGRATION_URL ?? "")) add("error", "DATABASE_MIGRATION_URL still contains the [YOUR-PASSWORD] placeholder.");
-  }
+    if (ref && mig?.ref && mig.ref !== ref) add("error", `DATABASE_MIGRATION_URL belongs to project ${mig.ref}, but NEXT_PUBLIC_SUPABASE_URL is project ${ref}.`);
+  } else if (mig && migUrl !== runtimeUrl) add("ok", `Migrations use the session pooler ${mig.host}:${mig.port} (derived)`);
+  else if (run) add("warn", "Migrations will use DATABASE_URL itself (not a Supabase pooler string, so no session connection could be derived).");
 
-  const pub = inspectKey(env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY);
+  const pub = inspectKey(publishableKey(env));
   if (!pub) add("error", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY is empty (API Keys → Publishable key).");
   else if (pub.kind === "secret" || pub.kind === "service-role-jwt")
     add("error", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY holds a SECRET key. It would be exposed to browsers: replace it with the publishable key and rotate the secret key.");
@@ -117,10 +199,10 @@ export function analyseSupabaseEnv(env: Env): { ref: string | null; findings: Fi
     if (ref && pub.ref && pub.ref !== ref) add("error", `The publishable key belongs to project ${pub.ref}, not ${ref}.`);
   }
 
-  const sec = inspectKey(env.SUPABASE_SERVICE_ROLE_KEY);
-  if (!sec) add(env.STORAGE_PROVIDER === "supabase" ? "error" : "warn", "SUPABASE_SERVICE_ROLE_KEY is empty (API Keys → Secret key). Needed for storage and identity provisioning.");
-  else if (sec.kind === "publishable" || sec.kind === "anon-jwt") add("error", "SUPABASE_SERVICE_ROLE_KEY holds a publishable key; it needs the secret (service_role) key.");
-  else if (sec.kind === "unknown") add("warn", "SUPABASE_SERVICE_ROLE_KEY is not a recognised Supabase key format.");
+  const sec = inspectKey(secretKey(env));
+  if (!sec) add(env.STORAGE_PROVIDER === "supabase" ? "error" : "warn", `${SECRET_KEY_VAR} is empty (API Keys → Secret keys). Needed for storage and identity provisioning.`);
+  else if (sec.kind === "publishable" || sec.kind === "anon-jwt") add("error", `${SECRET_KEY_VAR} holds a publishable key; it needs the secret key.`);
+  else if (sec.kind === "unknown") add("warn", `${SECRET_KEY_VAR} is not a recognised Supabase key format.`);
   else {
     add("ok", `Secret key: ${sec.kind}`);
     if (ref && sec.ref && sec.ref !== ref) add("error", `The secret key belongs to project ${sec.ref}, not ${ref}.`);

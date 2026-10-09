@@ -23,7 +23,18 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { openDatabase } from "../src/db";
 import { assertOwnDatabase } from "../src/db/guard";
 import { MIGRATIONS_DIR } from "../src/db/migrate";
-import { analyseSupabaseEnv, migrationDatabaseUrl, type Finding } from "../src/lib/supabase-env";
+import {
+  analyseSupabaseEnv,
+  clean,
+  databaseUrlFrom,
+  hasPasswordPlaceholder,
+  migrationDatabaseUrl,
+  publishableKey,
+  SECRET_KEY_VAR,
+  secretKey,
+  supabaseUrl,
+  type Finding,
+} from "../src/lib/supabase-env";
 
 const results: Finding[] = [];
 const mark = { ok: "✓", warn: "!", error: "✗" } as const;
@@ -53,15 +64,23 @@ async function checkDatabase(label: string, url: string | undefined) {
   }
 }
 
-// DATABASE_MIGRATION_URL is optional: derived from a Supabase pooler DATABASE_URL.
-const REQUIRED = ["DATABASE_URL", "NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "SUPABASE_SERVICE_ROLE_KEY"];
+/** Names of the values still to provide (DATABASE_MIGRATION_URL is derived, never required). */
+function missingValues(env: NodeJS.ProcessEnv) {
+  const missing: string[] = [];
+  if (!clean(env.DATABASE_URL)) missing.push("DATABASE_URL");
+  else if (hasPasswordPlaceholder(databaseUrlFrom(env))) missing.push("SUPABASE_DB_PASSWORD");
+  if (!supabaseUrl(env)) missing.push("NEXT_PUBLIC_SUPABASE_URL");
+  if (!publishableKey(env)) missing.push("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY");
+  if (!secretKey(env)) missing.push(SECRET_KEY_VAR);
+  return missing;
+}
 
 async function main() {
   const env = process.env;
   const build = process.argv.includes("--build");
   const roundtrip = process.argv.includes("--auth-roundtrip") || (build && env.APP_ENV !== "production");
   if (build) {
-    const missing = REQUIRED.filter((k) => !env[k]);
+    const missing = missingValues(env);
     if (env.AUTH_PROVIDER !== "supabase" || missing.length) {
       console.warn(`⚠ Supabase check skipped: ${env.AUTH_PROVIDER !== "supabase" ? "AUTH_PROVIDER is not supabase" : `missing ${missing.join(", ")}`}.`);
       return;
@@ -70,15 +89,16 @@ async function main() {
   console.log("\n1. Configuration");
   const { ref, findings } = analyseSupabaseEnv(env);
   for (const f of findings) report(f.level, f.message);
-  if (findings.some((f) => f.level === "error" && /empty|not a|placeholder|belongs to|SECRET/.test(f.message))) {
+  if (findings.some((f) => f.level === "error")) {
     console.log("\nFix the configuration above first.");
     process.exit(1);
   }
 
   console.log("\n2. Database");
-  const run = await checkDatabase("DATABASE_URL", env.DATABASE_URL);
+  const runUrl = databaseUrlFrom(env);
+  const run = await checkDatabase("DATABASE_URL", runUrl);
   const migUrl = migrationDatabaseUrl(env);
-  const mig = migUrl && migUrl !== env.DATABASE_URL ? await checkDatabase("Migration connection (session)", migUrl) : run;
+  const mig = migUrl && migUrl !== runUrl ? await checkDatabase("Migration connection (session)", migUrl) : run;
   const h = mig ?? run;
   if (h) {
     try {
@@ -99,8 +119,9 @@ async function main() {
   await mig?.close();
 
   console.log("\n3. Auth");
-  const url = env.NEXT_PUBLIC_SUPABASE_URL!;
-  const pub = env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
+  const url = supabaseUrl(env)!;
+  const pub = publishableKey(env)!;
+  const secret = secretKey(env);
   try {
     const res = await fetch(`${url}/auth/v1/settings`, { headers: { apikey: pub }, signal: AbortSignal.timeout(10_000) });
     if (!res.ok) report("error", `Auth API answered ${res.status} — is the publishable key from project ${ref}?`);
@@ -122,9 +143,9 @@ async function main() {
 
   console.log("\n4. Storage");
   const bucket = env.STORAGE_BUCKET ?? "ncc-files";
-  if (!env.SUPABASE_SERVICE_ROLE_KEY) report("warn", "Skipped (no secret key)");
+  if (!secret) report("warn", "Skipped (no secret key)");
   else {
-    const admin = createClient(url, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+    const admin = createClient(url, secret, { auth: { persistSession: false, autoRefreshToken: false } });
     const { data, error } = await admin.storage.getBucket(bucket);
     if (data) report(data.public ? "error" : "ok", data.public ? `Bucket "${bucket}" is PUBLIC; it must be private (npm run supabase:bootstrap fixes it)` : `Bucket "${bucket}" exists and is private`);
     else if (error && /not found/i.test(error.message)) report("warn", `Bucket "${bucket}" does not exist yet — npm run supabase:bootstrap (the Vercel build also creates it)`);

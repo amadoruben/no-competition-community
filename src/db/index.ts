@@ -3,6 +3,7 @@ import { drizzle as drizzlePostgres } from "drizzle-orm/postgres-js";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import postgres from "postgres";
 import * as schema from "./schema";
+import { databaseUrlFrom, sslFor } from "../lib/supabase-env";
 
 /**
  * One PostgreSQL database, two interchangeable drivers:
@@ -23,8 +24,9 @@ export interface DbHandle {
   close(): Promise<void>;
 }
 
+/** DATABASE_URL as pasted from Supabase → Connect, normalised (see lib/supabase-env). */
 export function databaseUrl() {
-  const url = process.env.DATABASE_URL;
+  const url = databaseUrlFrom(process.env);
   if (!url) throw new Error("DATABASE_URL is not set. See .env.example.");
   return url;
 }
@@ -41,6 +43,8 @@ export function openDatabase(url: string | undefined = undefined): DbHandle {
   }
   const client = postgres(url, {
     prepare: false,
+    // postgres.js defaults to no TLS; Supabase endpoints always get it.
+    ssl: sslFor(url),
     // Keep pools small on serverless (many instances × pool ≤ pooler limit).
     max: Number(process.env.DATABASE_POOL_MAX || (process.env.VERCEL ? 1 : 10)),
     connect_timeout: Number(process.env.DATABASE_CONNECT_TIMEOUT_S || 10),

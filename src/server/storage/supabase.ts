@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { StorageProvider } from "./types";
+import { secretKey, supabaseUrl } from "@/lib/supabase-env";
 
 /**
  * Supabase Storage adapter (server-side only, service role key). The bucket is
@@ -10,8 +11,8 @@ export class SupabaseStorageProvider implements StorageProvider {
   private client: SupabaseClient;
 
   constructor(
-    url = process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    url = supabaseUrl(process.env)!,
+    serviceKey = secretKey(process.env)!,
     private bucket = process.env.STORAGE_BUCKET ?? "ncc-files",
   ) {
     this.client = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });

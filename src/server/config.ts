@@ -3,6 +3,7 @@
  * providers so a misconfigured deployment fails fast with a clear message.
  */
 import { z } from "zod";
+import { databaseUrlFrom, hasPasswordPlaceholder, publishableKey, SECRET_KEY_VAR, secretKey, supabaseUrl } from "@/lib/supabase-env";
 
 const schema = z
   .object({
@@ -21,12 +22,14 @@ const schema = z
   })
   .superRefine((v, ctx) => {
     if (!v.DATABASE_URL) ctx.addIssue({ code: "custom", path: ["DATABASE_URL"], message: "required" });
+    else if (hasPasswordPlaceholder(v.DATABASE_URL))
+      ctx.addIssue({ code: "custom", path: ["SUPABASE_DB_PASSWORD"], message: "required: DATABASE_URL contains [YOUR-PASSWORD]" });
     const needsSupabase = v.AUTH_PROVIDER === "supabase" || v.STORAGE_PROVIDER === "supabase";
     if (needsSupabase && !v.NEXT_PUBLIC_SUPABASE_URL) ctx.addIssue({ code: "custom", path: ["NEXT_PUBLIC_SUPABASE_URL"], message: "required by the Supabase providers" });
     if (v.AUTH_PROVIDER === "supabase" && !v.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)
       ctx.addIssue({ code: "custom", path: ["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"], message: "required by AUTH_PROVIDER=supabase" });
     if (v.STORAGE_PROVIDER === "supabase" && !v.SUPABASE_SERVICE_ROLE_KEY)
-      ctx.addIssue({ code: "custom", path: ["SUPABASE_SERVICE_ROLE_KEY"], message: "required by STORAGE_PROVIDER=supabase" });
+      ctx.addIssue({ code: "custom", path: [SECRET_KEY_VAR], message: "required by STORAGE_PROVIDER=supabase" });
     if (process.env.VERCEL && v.STORAGE_PROVIDER === "local")
       ctx.addIssue({ code: "custom", path: ["STORAGE_PROVIDER"], message: "local storage is not persistent on Vercel; use supabase" });
     if (process.env.VERCEL_ENV === "production" && !process.env.APP_ENV)
@@ -37,9 +40,19 @@ const schema = z
 
 export type Config = z.infer<typeof schema>;
 
-/** `KEY=` in a .env file or an empty dashboard field means "not set", not "invalid". */
+/**
+ * The environment as the app will use it: empty values (`KEY=`) mean "not set",
+ * and Supabase values are normalised exactly as the database and auth code do.
+ */
 function definedEnv() {
-  return Object.fromEntries(Object.entries(process.env).filter(([, v]) => v !== ""));
+  const env = Object.fromEntries(Object.entries(process.env).filter(([, v]) => v !== ""));
+  return {
+    ...env,
+    DATABASE_URL: databaseUrlFrom(process.env),
+    NEXT_PUBLIC_SUPABASE_URL: supabaseUrl(process.env),
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: publishableKey(process.env),
+    SUPABASE_SERVICE_ROLE_KEY: secretKey(process.env),
+  };
 }
 let cached: Config | undefined;
 

@@ -6,16 +6,17 @@
  * build (--skip-if-unconfigured: no-op unless STORAGE_PROVIDER=supabase); never in the browser.
  */
 import { createClient } from "@supabase/supabase-js";
+import { secretKey, supabaseUrl } from "../src/lib/supabase-env";
 
 async function main() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = supabaseUrl(process.env);
+  const key = secretKey(process.env);
   const bucket = process.env.STORAGE_BUCKET ?? "ncc-files";
   if (process.argv.includes("--skip-if-unconfigured") && (process.env.STORAGE_PROVIDER !== "supabase" || !url || !key)) {
     console.warn("⚠ Supabase storage not configured: skipping bucket setup.");
     return;
   }
-  if (!url || !key) throw new Error("Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.");
+  if (!url || !key) throw new Error("Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SECRET_KEY.");
   const sb = createClient(url, key, { auth: { persistSession: false } });
   const options = { public: false, fileSizeLimit: 2 * 1024 * 1024, allowedMimeTypes: ["image/png", "image/jpeg", "image/webp"] };
   const { data: existing } = await sb.storage.getBucket(bucket);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analyseSupabaseEnv, inspectDbUrl, inspectKey, migrationDatabaseUrl } from "../supabase-env";
+import { analyseSupabaseEnv, databaseUrlFrom, inspectDbUrl, inspectKey, migrationDatabaseUrl, secretKey, sslFor, supabaseUrl } from "../supabase-env";
 
 // Fictitious refs and keys: shaped like Supabase's, valid nowhere.
 const A = "aaaaaaaaaaaaaaaaaaaa";
@@ -42,7 +42,7 @@ describe("supabase env analysis", () => {
 
   it("flags swapped pooler modes and the password placeholder", () => {
     expect(errors({ ...good, DATABASE_MIGRATION_URL: good.DATABASE_URL }).join()).toContain("session pooler");
-    expect(errors({ ...good, DATABASE_URL: good.DATABASE_URL.replace("pw-secret-1", "[YOUR-PASSWORD]") }).join()).toContain("placeholder");
+    expect(errors({ ...good, DATABASE_URL: good.DATABASE_URL.replace("pw-secret-1", "[YOUR-PASSWORD]") }).join()).toContain("SUPABASE_DB_PASSWORD");
   });
 
   it("parses direct and pooler URLs", () => {
@@ -55,10 +55,62 @@ describe("supabase env analysis", () => {
     const withoutMig = { ...good, DATABASE_MIGRATION_URL: undefined };
     expect(migrationDatabaseUrl(withoutMig)).toBe(good.DATABASE_MIGRATION_URL);
     expect(errors(withoutMig)).toEqual([]);
-    expect(JSON.stringify(analyseSupabaseEnv(withoutMig).findings)).toContain("derived from DATABASE_URL");
+    expect(JSON.stringify(analyseSupabaseEnv(withoutMig).findings)).toContain("(derived)");
     // An explicit value wins; non-Supabase URLs are used unchanged.
     expect(migrationDatabaseUrl({ ...good, DATABASE_MIGRATION_URL: "postgres://x@db.example:5432/y" })).toBe("postgres://x@db.example:5432/y");
     expect(migrationDatabaseUrl({ DATABASE_URL: "postgres://u@localhost:5432/ncc" })).toBe("postgres://u@localhost:5432/ncc");
     expect(migrationDatabaseUrl({})).toBeUndefined();
+  });
+
+  describe("values pasted exactly as the Supabase dashboard shows them", () => {
+    const template = `postgresql://postgres.${A}:[YOUR-PASSWORD]@aws-0-eu-west-2.pooler.supabase.com:6543/postgres`;
+
+    it("inserts SUPABASE_DB_PASSWORD into [YOUR-PASSWORD], URL-encoding any character", () => {
+      const password = "p@ss/w:rd#1?$&";
+      const env = { ...good, DATABASE_URL: template, DATABASE_MIGRATION_URL: undefined, SUPABASE_DB_PASSWORD: password };
+      const url = new URL(databaseUrlFrom(env)!);
+      expect(decodeURIComponent(url.password)).toBe(password);
+      expect(url.username).toBe(`postgres.${A}`);
+      expect(new URL(migrationDatabaseUrl(env)!).port).toBe("5432");
+      expect(errors(env)).toEqual([]);
+      expect(JSON.stringify(analyseSupabaseEnv(env).findings)).not.toContain("p@ss");
+    });
+
+    it("asks for SUPABASE_DB_PASSWORD when the placeholder is left in", () => {
+      expect(errors({ ...good, DATABASE_URL: template, DATABASE_MIGRATION_URL: undefined }).join()).toContain("SUPABASE_DB_PASSWORD");
+    });
+
+    it("accepts the session-pooler string and switches the app to transaction mode", () => {
+      const session = template.replace(":6543", ":5432");
+      const env = { ...good, DATABASE_URL: session, DATABASE_MIGRATION_URL: undefined, SUPABASE_DB_PASSWORD: "x" };
+      expect(new URL(databaseUrlFrom(env)!).port).toBe("6543");
+      expect(new URL(migrationDatabaseUrl(env)!).port).toBe("5432");
+    });
+
+    it("drops parameters the driver would reject and trims quotes, spaces and line breaks", () => {
+      const env = { DATABASE_URL: `  "${template}?pgbouncer=true&connection_limit=1&sslmode=require"\n`, SUPABASE_DB_PASSWORD: " pw \n" };
+      const url = new URL(databaseUrlFrom(env)!);
+      expect([...url.searchParams.keys()]).toEqual(["sslmode"]);
+      expect(url.password).toBe("pw");
+    });
+
+    it("reduces the project URL to its origin and accepts the dashboard's key name", () => {
+      expect(supabaseUrl({ NEXT_PUBLIC_SUPABASE_URL: ` https://${A}.supabase.co/rest/v1/ ` })).toBe(`https://${A}.supabase.co`);
+      expect(secretKey({ SUPABASE_SECRET_KEY: " sb_secret_new " })).toBe("sb_secret_new");
+      expect(secretKey({ SUPABASE_SERVICE_ROLE_KEY: "sb_secret_old" })).toBe("sb_secret_old");
+    });
+
+    it("requires TLS for Supabase hosts only, unless the URL sets sslmode", () => {
+      expect(sslFor(good.DATABASE_URL)).toBe("require");
+      expect(sslFor(`postgresql://postgres:x@db.${A}.supabase.co:5432/postgres`)).toBe("require");
+      expect(sslFor(`${good.DATABASE_URL}?sslmode=disable`)).toBeUndefined();
+      expect(sslFor("postgres://postgres@localhost:5432/ncc")).toBeUndefined();
+    });
+
+    it("warns that the direct connection cannot be reached from Vercel", () => {
+      const direct = `postgresql://postgres:pw@db.${A}.supabase.co:5432/postgres`;
+      const text = JSON.stringify(analyseSupabaseEnv({ ...good, DATABASE_URL: direct, DATABASE_MIGRATION_URL: undefined }).findings);
+      expect(text).toContain("Transaction pooler");
+    });
   });
 });

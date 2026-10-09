@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { TOKEN_HASH_PREFIX } from "@/lib/auth-links";
+import { publishableKey as envPublishableKey, SECRET_KEY_VAR, secretKey, supabaseUrl } from "@/lib/supabase-env";
 import { AuthError, type AuthIdentity, type AuthProvider, type EmailLink } from "./types";
 
 /**
@@ -14,8 +15,8 @@ export class SupabaseAuthProvider implements AuthProvider {
   readonly name = "supabase";
 
   constructor(
-    private url = required("NEXT_PUBLIC_SUPABASE_URL"),
-    private publishableKey = required("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"),
+    private url = required("NEXT_PUBLIC_SUPABASE_URL", supabaseUrl(process.env)),
+    private publishableKey = required("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", envPublishableKey(process.env)),
     /** Injectable for contract tests; defaults to global fetch. */
     private fetchImpl?: typeof fetch,
   ) {}
@@ -38,7 +39,7 @@ export class SupabaseAuthProvider implements AuthProvider {
   }
 
   private admin(): SupabaseClient {
-    return createClient(this.url, required("SUPABASE_SERVICE_ROLE_KEY"), { auth: { persistSession: false, autoRefreshToken: false } });
+    return createClient(this.url, required(SECRET_KEY_VAR, secretKey(process.env)), { auth: { persistSession: false, autoRefreshToken: false } });
   }
 
   async signIn(email: string, password: string): Promise<AuthIdentity> {
@@ -115,8 +116,7 @@ export class SupabaseAuthProvider implements AuthProvider {
 // PKCE links only work in the browser that asked for them; say so instead of a bare "expired".
 const LINK_FAILED = "O link expirou, já foi utilizado ou foi aberto noutro browser — abra-o no mesmo browser onde fez o pedido.";
 
-function required(name: string) {
-  const v = process.env[name];
+function required(name: string, v: string | undefined) {
   if (!v) throw new Error(`${name} is required when AUTH_PROVIDER=supabase`);
   return v;
 }

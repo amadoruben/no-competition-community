@@ -56,4 +56,22 @@ describe("configIssues", () => {
     vi.stubEnv("AUTH_PROVIDER", "supabase");
     expect(configIssues()).toContain("NEXT_PUBLIC_SUPABASE_URL: required by the Supabase providers");
   });
+
+  it("names exactly what is missing for a dashboard paste", () => {
+    vi.stubEnv("VERCEL_ENV", undefined);
+    vi.stubEnv("APP_ENV", "preview");
+    vi.stubEnv("AUTH_PROVIDER", "supabase");
+    vi.stubEnv("STORAGE_PROVIDER", "supabase");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://aaaaaaaaaaaaaaaaaaaa.supabase.co/rest/v1/");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "sb_publishable_x");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", undefined);
+    vi.stubEnv("SUPABASE_SECRET_KEY", undefined);
+    vi.stubEnv("SUPABASE_DB_PASSWORD", undefined);
+    vi.stubEnv("DATABASE_URL", "postgresql://postgres.aaaaaaaaaaaaaaaaaaaa:[YOUR-PASSWORD]@aws-0-eu-west-2.pooler.supabase.com:6543/postgres");
+    expect(configIssues().map((i) => i.split(":")[0]).sort()).toEqual(["SUPABASE_DB_PASSWORD", "SUPABASE_SECRET_KEY"]);
+    vi.stubEnv("SUPABASE_DB_PASSWORD", "pw");
+    vi.stubEnv("SUPABASE_SECRET_KEY", "sb_secret_x");
+    expect(configIssues()).toEqual([]);
+  });
 });
+

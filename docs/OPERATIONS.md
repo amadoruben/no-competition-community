@@ -20,10 +20,8 @@ Guia detalhado com a localização exacta de cada valor: [`SUPABASE-SETUP.md`](S
 
 Pré-requisitos que dependem do titular das contas: projecto Supabase dedicado (região próxima da função Vercel) e projecto Vercel ligado ao repositório.
 
-1. **Supabase → Connect**: copiar
-   - *Transaction pooler* (porta 6543) → `DATABASE_URL`
-   - *Session pooler* (porta 5432) → `DATABASE_MIGRATION_URL` (a Vercel é IPv4; a ligação directa é IPv6 sem o add-on)
-2. **Supabase → API keys**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (secreta).
+1. **Supabase → Connect**: copiar a *connection string* do pooler **tal como está** (com `[YOUR-PASSWORD]`) → `DATABASE_URL`; a palavra-passe da base → `SUPABASE_DB_PASSWORD`. A aplicação insere a palavra-passe e escolhe o modo certo (6543 na app, 5432 nas migrações). A ligação directa é IPv6 e não serve na Vercel.
+2. **Supabase → API keys**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` (secreta; o nome antigo `SUPABASE_SERVICE_ROLE_KEY` também é aceite).
 3. **Supabase → Auth → URL Configuration**: Site URL = domínio da app; Redirect URLs:
    - `https://<domínio>/auth/callback` (confirmação de email no registo)
    - `https://<domínio>/reset-password` (recuperação de palavra-passe)
@@ -120,7 +118,7 @@ Não há base de dados secundária activa nem failover automático (sem necessid
 
 ## 7. Segurança operacional
 
-- `SUPABASE_SERVICE_ROLE_KEY` só no servidor (nunca `NEXT_PUBLIC_`); rodar se exposta.
+- `SUPABASE_SECRET_KEY` (ou `SUPABASE_SERVICE_ROLE_KEY`) e `SUPABASE_DB_PASSWORD` só no servidor (nunca `NEXT_PUBLIC_`); rodar se exposta.
 - Papel da BD da aplicação: o dono das tabelas (necessário para migrações). Para backups, preferir um papel só de leitura.
 - `DEMO_MODE=0` em produção (desliga o acesso de um clique).
 - Contas de demonstração (`*@demo.ncc`, palavra-passe `demo1234`) só em ambientes de demo.

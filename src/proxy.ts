@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { publishableKey, supabaseUrl } from "@/lib/supabase-env";
 
 /**
  * Only active with AUTH_PROVIDER=supabase: refreshes the Supabase session
@@ -9,7 +10,10 @@ import { NextResponse, type NextRequest } from "next/server";
 export async function proxy(request: NextRequest) {
   if (process.env.AUTH_PROVIDER !== "supabase") return NextResponse.next();
   let response = NextResponse.next({ request });
-  const supabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, {
+  const url = supabaseUrl(process.env);
+  const key = publishableKey(process.env);
+  if (!url || !key) return NextResponse.next({ request }); // unconfigured: /api/health reports it
+  const supabase = createServerClient(url, key, {
     cookies: {
       getAll: () => request.cookies.getAll(),
       setAll: (list) => {
