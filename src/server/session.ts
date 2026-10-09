@@ -1,5 +1,6 @@
 import "server-only";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { cache } from "react";
 import type { Role, User } from "@/db/schema";
 import { resolveUser } from "./accounts";
@@ -7,6 +8,10 @@ import { auth } from "./auth";
 
 /** The signed-in application user for this request (validated by the auth provider). */
 export const currentUser = cache(async (): Promise<User | null> => {
+  // A session only exists at request time. Saying so before touching the
+  // provider keeps prerendering from constructing it (and failing the build
+  // when its configuration is incomplete).
+  await connection();
   const identity = await auth().currentIdentity();
   return identity ? resolveUser(identity) : null;
 });

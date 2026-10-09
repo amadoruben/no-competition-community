@@ -7,7 +7,7 @@ const PORT = 3100;
  * embedded PGlite directory is used.
  */
 export const E2E_DATABASE_URL = process.env.E2E_DATABASE_URL ?? "pglite://data/e2e-pglite";
-const env = `DATABASE_URL=${E2E_DATABASE_URL} APP_ENV=test DEMO_MODE=1 INSECURE_COOKIES=1 STORAGE_LOCAL_DIR=data/e2e-uploads DB_AUTO_MIGRATE=1`;
+const env = `DATABASE_URL=${E2E_DATABASE_URL} APP_ENV=test AUTH_PROVIDER=local STORAGE_PROVIDER=local DEMO_MODE=1 INSECURE_COOKIES=1 STORAGE_LOCAL_DIR=data/e2e-uploads DB_AUTO_MIGRATE=1`;
 
 export default defineConfig({
   testDir: "e2e",

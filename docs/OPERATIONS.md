@@ -16,6 +16,8 @@ Variáveis: ver `.env.example` (comentado). A configuração é validada no arra
 
 ## 2. Primeiro deploy: Vercel + Supabase
 
+Guia detalhado com a localização exacta de cada valor: [`SUPABASE-SETUP.md`](SUPABASE-SETUP.md).
+
 Pré-requisitos que dependem do titular das contas: projecto Supabase dedicado (região próxima da função Vercel) e projecto Vercel ligado ao repositório.
 
 1. **Supabase → Connect**: copiar
@@ -28,7 +30,7 @@ Pré-requisitos que dependem do titular das contas: projecto Supabase dedicado (
    - para previews da Vercel, o padrão com wildcard `https://*-<conta>.vercel.app/**` — só no projecto Supabase de preview/demo, nunca no de produção.
 4. Localmente, com essas variáveis: `npm run supabase:bootstrap` (cria o bucket privado) e, só para demo, `APP_ENV=demo npm run db:seed`.
 5. **Vercel → Environment Variables** (por ambiente — *Production* e *Preview* com projectos Supabase diferentes): todas as anteriores + `APP_ENV`, `AUTH_PROVIDER=supabase`, `STORAGE_PROVIDER=supabase`, `APP_URL`, `DEMO_MODE`. Num deploy de produção da Vercel, `APP_ENV` é obrigatório (a validação recusa o valor por omissão) e o acesso de demonstração fica desligado salvo `DEMO_MODE=1` explícito.
-6. Deploy (push para a branch; `vercel.json` fixa o preset Next.js e o comando `npm run vercel-build`). O build aplica migrações (`db:migrate`, idempotente, com lock) quando `DATABASE_URL` existe; sem ela o build passa e a app arranca em modo "não configurado". Verificar `https://<domínio>/api/health` → `200`. Em `503`, o JSON lista **os nomes** das variáveis em falta (nunca valores).
+6. Deploy (push para a branch; `vercel.json` fixa o preset Next.js e o comando `npm run vercel-build`). O build cria/actualiza o bucket privado (com `STORAGE_PROVIDER=supabase`) e aplica migrações — e recusa uma base que pertença a outro produto (`src/db/guard.ts`). As migrações são aplicadas (`db:migrate`, idempotente, com lock) quando `DATABASE_URL` existe; sem ela o build passa e a app arranca em modo "não configurado". Verificar `https://<domínio>/api/health` → `200`. Em `503`, o JSON lista **os nomes** das variáveis em falta (nunca valores).
 7. Correr o *advisor* de segurança do Supabase: não deve haver tabelas sem RLS.
 8. **Email (obrigatório antes de abrir registos ao público):** configurar SMTP próprio no Supabase (§8).
 

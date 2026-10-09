@@ -34,17 +34,22 @@ const schema = z
   });
 
 export type Config = z.infer<typeof schema>;
+
+/** `KEY=` in a .env file or an empty dashboard field means "not set", not "invalid". */
+function definedEnv() {
+  return Object.fromEntries(Object.entries(process.env).filter(([, v]) => v !== ""));
+}
 let cached: Config | undefined;
 
 /** Problems with the current configuration, as "VARIABLE: reason" (never values). */
 export function configIssues(): string[] {
-  const r = schema.safeParse(process.env);
+  const r = schema.safeParse(definedEnv());
   return r.success ? [] : r.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`);
 }
 
 export function config(): Config {
   if (cached) return cached;
-  const r = schema.safeParse(process.env);
+  const r = schema.safeParse(definedEnv());
   if (!r.success) {
     const lines = r.error.issues.map((i) => `  - ${i.path.join(".")}: ${i.message}`).join("\n");
     throw new Error(`Invalid configuration:\n${lines}\nSee .env.example and docs/OPERATIONS.md.`);

@@ -5,6 +5,7 @@ Plataforma onde um investidor lança desafios, os membros constroem e submetem p
 > Os dados de demonstração são **fictícios**.
 
 - Arquitectura e versões: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+- **Ligar ao Supabase (passo a passo):** [`docs/SUPABASE-SETUP.md`](docs/SUPABASE-SETUP.md)
 - Deploy, backups, monitorização e mudança de fornecedor: [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
 - Design system: [`docs/DESIGN-SYSTEM.md`](docs/DESIGN-SYSTEM.md) · referência viva em `/design`
 
@@ -50,7 +51,9 @@ A página pública **`/demo`** (visita guiada) tem estes passos com um botão qu
 | `npm run db:export -- --out f.json` | exportação portável com checksums |
 | `npm run db:import -- f.json` | restaurar numa base vazia e verificar |
 | `npm run db:verify -- f.json` | comparar base viva com exportação |
+| `npm run supabase:check` | diagnóstico da ligação ao Supabase sem mostrar segredos (`-- --auth-roundtrip` testa login real) |
 | `npm run supabase:bootstrap` | criar o bucket privado no Supabase |
+| `npm run user:role -- <email> <papel>` | promover uma conta a `investor`/`evaluator` (só com credenciais da BD) |
 
 ## Testes
 

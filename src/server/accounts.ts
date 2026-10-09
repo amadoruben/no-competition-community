@@ -55,3 +55,16 @@ export async function userBySubject(subject: string) {
   const [u] = await db.select().from(users).where(eq(users.authSubject, subject)).limit(1);
   return u ?? null;
 }
+
+/**
+ * Operator action (CLI only, needs database credentials): change a user's role.
+ * There is deliberately no web endpoint for this: the first investor of a real
+ * installation is created here, after they register normally.
+ */
+export async function setUserRole(email: string, role: User["role"]) {
+  const key = parse(emailSchema, email);
+  const [u] = await db.update(users).set({ role }).where(eq(users.email, key)).returning();
+  if (!u) throw new Error(`No user with email ${key}. They must register (or sign in once) first.`);
+  logger.info("account.role_changed", { userId: u.id, role });
+  return u;
+}

@@ -40,4 +40,16 @@ describe("configIssues", () => {
     expect(issues.some((i) => i.startsWith("APP_ENV"))).toBe(true);
     expect(issues.join(" ")).not.toContain("secret-value");
   });
+
+  it("treats empty values (KEY= in .env files) as unset, not invalid", () => {
+    vi.stubEnv("VERCEL_ENV", undefined);
+    vi.stubEnv("DATABASE_URL", "postgres://localhost/x");
+    vi.stubEnv("AUTH_PROVIDER", "local");
+    vi.stubEnv("STORAGE_PROVIDER", "local");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "");
+    vi.stubEnv("APP_URL", "");
+    expect(configIssues()).toEqual([]);
+    vi.stubEnv("AUTH_PROVIDER", "supabase");
+    expect(configIssues()).toContain("NEXT_PUBLIC_SUPABASE_URL: required by the Supabase providers");
+  });
 });

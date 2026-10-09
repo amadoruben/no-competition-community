@@ -18,7 +18,7 @@ test.skip(!URL_ || !STOP || !START, "Set E2E_RESILIENCE_DATABASE_URL, E2E_PG_STO
 test.use({ baseURL: BASE });
 
 let server: ChildProcess | undefined;
-const env = { ...process.env, DATABASE_URL: URL_!, APP_ENV: "test", DEMO_MODE: "1", INSECURE_COOKIES: "1", DB_AUTO_MIGRATE: "1", DATABASE_CONNECT_TIMEOUT_S: "3" };
+const env = { ...process.env, DATABASE_URL: URL_!, APP_ENV: "test", AUTH_PROVIDER: "local", STORAGE_PROVIDER: "local", DEMO_MODE: "1", INSECURE_COOKIES: "1", DB_AUTO_MIGRATE: "1", DATABASE_CONNECT_TIMEOUT_S: "3" };
 
 async function startServer() {
   server = spawn("npx", ["next", "start", "-p", String(PORT)], { env, stdio: "ignore", detached: true });
