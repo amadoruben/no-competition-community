@@ -33,8 +33,12 @@ describe("configIssues", () => {
     vi.stubEnv("VERCEL_ENV", "production");
     vi.stubEnv("APP_ENV", undefined);
     vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "secret-value-should-not-leak");
-    expect(configIssues().some((i) => i.startsWith("DATABASE_URL"))).toBe(true);
-    // Cross-field rules run once the basic shape is valid.
+    vi.stubEnv("AUTH_PROVIDER", "supabase");
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", undefined);
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", undefined);
+    // Every problem is reported at once, so an operator fixes them in one pass.
+    const all = configIssues().map((i) => i.split(":")[0]);
+    expect(all).toEqual(expect.arrayContaining(["DATABASE_URL", "APP_ENV", "NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"]));
     vi.stubEnv("DATABASE_URL", "postgres://user:secret-value-should-not-leak@db.example:6543/postgres");
     const issues = configIssues();
     expect(issues.some((i) => i.startsWith("APP_ENV"))).toBe(true);

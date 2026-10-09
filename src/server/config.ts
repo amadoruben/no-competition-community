@@ -7,7 +7,8 @@ import { z } from "zod";
 const schema = z
   .object({
     APP_ENV: z.enum(["development", "test", "preview", "demo", "production"]).default("development"),
-    DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
+    // Required, but checked in superRefine so every missing variable is reported at once.
+    DATABASE_URL: z.string().optional(),
     AUTH_PROVIDER: z.enum(["local", "supabase"]).default("local"),
     STORAGE_PROVIDER: z.enum(["local", "supabase"]).default("local"),
     DEMO_MODE: z.enum(["0", "1"]).optional(),
@@ -19,6 +20,7 @@ const schema = z
     APP_URL: z.url().optional(),
   })
   .superRefine((v, ctx) => {
+    if (!v.DATABASE_URL) ctx.addIssue({ code: "custom", path: ["DATABASE_URL"], message: "required" });
     const needsSupabase = v.AUTH_PROVIDER === "supabase" || v.STORAGE_PROVIDER === "supabase";
     if (needsSupabase && !v.NEXT_PUBLIC_SUPABASE_URL) ctx.addIssue({ code: "custom", path: ["NEXT_PUBLIC_SUPABASE_URL"], message: "required by the Supabase providers" });
     if (v.AUTH_PROVIDER === "supabase" && !v.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)
@@ -29,7 +31,7 @@ const schema = z
       ctx.addIssue({ code: "custom", path: ["STORAGE_PROVIDER"], message: "local storage is not persistent on Vercel; use supabase" });
     if (process.env.VERCEL_ENV === "production" && !process.env.APP_ENV)
       ctx.addIssue({ code: "custom", path: ["APP_ENV"], message: "must be set explicitly on a production deployment" });
-    if (process.env.VERCEL && v.DATABASE_URL.startsWith("pglite://"))
+    if (process.env.VERCEL && v.DATABASE_URL?.startsWith("pglite://"))
       ctx.addIssue({ code: "custom", path: ["DATABASE_URL"], message: "embedded PGlite is not persistent on Vercel; use a PostgreSQL URL" });
   });
 
