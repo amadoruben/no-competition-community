@@ -2,6 +2,7 @@ import { ArrowRight, Plus } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ChallengeCover, PhaseBadge } from "@/components/domain";
+import { FirstSteps } from "@/components/first-steps";
 import { Badge, BarList, ButtonLink, Card, CardHeader, cx, EmptyState, PageHeader, Progress } from "@/components/ui";
 import { fmtDay, timeAgo } from "@/lib/format";
 import { OPPORTUNITY_TONE } from "@/lib/labels";
@@ -23,6 +24,15 @@ export default async function AdminPage() {
     ["Resultados por publicar", o.kpis.toPublish, "confirmados, ainda privados"],
     ["Oportunidades em curso", o.kpis.pipeline, "pipeline de investimento"],
   ] as const;
+  const first = o.rows[0] ? `/admin/challenges/${o.rows[0].id}` : "/admin/challenges/new";
+  const s = o.setup;
+  const steps = [
+    { done: s.challengeCreated, title: "Criar o primeiro desafio", detail: "Tema, prazos, critérios de avaliação e prémios. Fica em rascunho até o publicar.", href: "/admin/challenges/new", cta: "Criar desafio" },
+    { done: s.challengePublished, title: "Publicar o desafio", detail: "Os membros passam a vê-lo e a inscrever-se.", href: first, cta: "Abrir desafio" },
+    { done: s.hasMembers, title: "Trazer os primeiros membros", detail: "Partilhe o endereço da plataforma: quem se regista entra como membro.", href: "/admin/people", cta: "Ver membros" },
+    { done: s.hasEvaluators, title: "Nomear avaliadores", detail: "Em Membros e papéis, torne avaliador(a) quem vai pontuar as submissões.", href: "/admin/people", cta: "Membros e papéis" },
+    { done: s.evaluatorsAssigned, title: "Atribuir avaliadores ao desafio", detail: "Cada avaliador(a) só vê as submissões dos desafios atribuídos.", href: `${first}?tab=evaluators`, cta: "Atribuir" },
+  ];
 
   return (
     <div className="space-y-6">
@@ -38,6 +48,9 @@ export default async function AdminPage() {
         }
       />
 
+      <FirstSteps title="Preparar a plataforma" steps={steps} />
+
+      {s.challengeCreated && (
       <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
         {kpis.map(([k, v, h], i) => (
           <div key={k} className={cx("rounded-2xl px-4 py-3 ring-1", i === 2 && v > 0 ? "bg-ink text-white ring-ink" : "bg-surface ring-line")}>
@@ -47,6 +60,7 @@ export default async function AdminPage() {
           </div>
         ))}
       </dl>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         <Card className="min-w-0">

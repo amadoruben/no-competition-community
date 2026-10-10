@@ -158,7 +158,7 @@ export default async function ChallengePage(props: PageProps<"/challenges/[slug]
               (d.participants.length === 0 ? (
                 <Card>
                   <EmptyState icon={<Users className="size-5" />} title={c.participantsVisible ? "Ainda sem participantes" : "Participantes privados"}>
-                    {c.participantsVisible ? "Seja a primeira equipa a inscrever-se." : "Neste desafio a lista de participantes só é visível para a investidora e avaliadores."}
+                    {c.participantsVisible ? "Seja a primeira equipa a inscrever-se." : "Neste desafio a lista de participantes só é visível para o investidor e os avaliadores."}
                   </EmptyState>
                 </Card>
               ) : (

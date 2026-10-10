@@ -251,7 +251,7 @@ export default async function ManageChallenge(props: PageProps<"/admin/challenge
           <Card className="p-5 text-sm text-ink-2">
             <h3 className="mb-2 font-semibold text-ink">Como funciona a avaliação</h3>
             <p>Cada avaliador atribui uma nota de 0 a 10 a cada critério. A nota da avaliação é a média ponderada pelos pesos (0–100) e a nota final da submissão é a média das avaliações completas.</p>
-            <p className="mt-3">Os avaliadores não vêem as notas uns dos outros, para evitar efeito de ancoragem. Só a investidora vê o quadro completo.</p>
+            <p className="mt-3">Os avaliadores não vêem as notas uns dos outros, para evitar efeito de ancoragem. Só o investidor vê o quadro completo.</p>
           </Card>
         </div>
       )}

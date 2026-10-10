@@ -6,7 +6,22 @@ import { useEffect, useRef, useState } from "react";
 import { logoutAction } from "@/app/actions";
 import { Avatar } from "./ui";
 
-export function UserMenu({ name, handle, hue, fileId, roleLabel }: { name: string; handle: string; hue: number; fileId?: string | null; roleLabel: string }) {
+export function UserMenu({
+  name,
+  handle,
+  hue,
+  fileId,
+  roleLabel,
+  placement = "down",
+}: {
+  name: string;
+  handle: string;
+  hue: number;
+  fileId?: string | null;
+  roleLabel: string;
+  /** "up": full-width block at the bottom of the sidebar, menu opens above it. */
+  placement?: "down" | "up";
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -30,16 +45,27 @@ export function UserMenu({ name, handle, hue, fileId, roleLabel }: { name: strin
         aria-expanded={open}
         aria-haspopup="menu"
         aria-label={`Conta de ${name}`}
-        className="flex items-center gap-2 rounded-full p-0.5 pr-0.5 transition-colors hover:bg-sunken sm:pr-3"
+        className={
+          placement === "up"
+            ? "flex w-full items-center gap-2.5 rounded-xl p-2 text-left transition-colors hover:bg-sunken"
+            : "flex items-center gap-2 rounded-full p-0.5 pr-0.5 transition-colors hover:bg-sunken sm:pr-3"
+        }
       >
         <Avatar name={name} hue={hue} fileId={fileId} size={34} />
-        <span className="hidden text-left sm:block">
-          <span className="block text-[13px] leading-tight font-medium">{name.split(" ")[0]}</span>
+        <span className={placement === "up" ? "min-w-0 flex-1" : "hidden text-left sm:block"}>
+          <span className="block truncate text-[13px] leading-tight font-medium">{placement === "up" ? name : name.split(" ")[0]}</span>
           <span className="block text-[11px] leading-tight text-muted">{roleLabel}</span>
         </span>
       </button>
       {open && (
-        <div role="menu" className="absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-xl bg-surface p-1 shadow-[var(--shadow-pop)] ring-1 ring-line">
+        <div
+          role="menu"
+          className={
+            placement === "up"
+              ? "absolute right-0 bottom-full left-0 z-50 mb-2 overflow-hidden rounded-xl bg-surface p-1 shadow-[var(--shadow-pop)] ring-1 ring-line"
+              : "absolute right-0 z-50 mt-2 w-56 overflow-hidden rounded-xl bg-surface p-1 shadow-[var(--shadow-pop)] ring-1 ring-line"
+          }
+        >
           <div className="px-3 py-2">
             <div className="truncate text-sm font-medium">{name}</div>
             <div className="text-[12px] text-muted">@{handle}</div>

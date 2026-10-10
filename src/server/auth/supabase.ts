@@ -204,9 +204,9 @@ function signUpError(e: ProviderError): AuthError {
   return new AuthError("Não foi possível criar a conta. Verifique os dados e tente novamente.");
 }
 
-function identityOf(u: { id: string; email?: string; user_metadata?: Record<string, unknown> }): AuthIdentity {
+function identityOf(u: { id: string; email?: string; email_confirmed_at?: string | null; user_metadata?: Record<string, unknown> }): AuthIdentity {
   const name = typeof u.user_metadata?.name === "string" ? u.user_metadata.name.trim() : "";
-  return { subject: u.id, email: u.email!, ...(name ? { name } : {}) };
+  return { subject: u.id, email: u.email!, emailVerified: !!u.email_confirmed_at, ...(name ? { name } : {}) };
 }
 
 function required(name: string, v: string | undefined) {

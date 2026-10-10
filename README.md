@@ -54,7 +54,7 @@ A página pública **`/demo`** (visita guiada) tem estes passos com um botão qu
 | `npm run supabase:check` | diagnóstico da ligação ao Supabase sem mostrar segredos (`-- --auth-roundtrip` testa login real) |
 | `npm run supabase:bootstrap` | criar o bucket privado no Supabase |
 | `npm run supabase:auth-config` | configurar SMTP, modelos de email PT-PT, Site URL e Redirect URLs do Supabase Auth (dry run; `-- --apply` aplica) |
-| `npm run user:role -- <email> <papel>` | promover uma conta a `investor`/`evaluator` (só com credenciais da BD) |
+| `npm run user:role -- <email> <papel>` | promover uma conta a `investor`/`evaluator` (só com credenciais da BD). Na web: `OWNER_EMAILS` torna o dono investidor; o investidor nomeia avaliadores em `/admin/people` |
 
 ## Testes
 

@@ -284,6 +284,9 @@ async function main() {
           ? "Email confirmation is OFF: accounts can sign in immediately"
           : "Email confirmation is ON: /register sends an email (default Supabase SMTP only delivers to the organisation's team members)",
       );
+      // Auto-confirmed emails count as verified, so OWNER_EMAILS would hand the investor role to whoever registers that address first.
+      if (s.mailer_autoconfirm && env.OWNER_EMAILS)
+        report("error", "OWNER_EMAILS is set while email confirmation is OFF: anyone registering an owner address would become investor. Turn confirmation on or unset OWNER_EMAILS.");
     }
   } catch (e) {
     report("error", `Auth API unreachable — ${reason(e)}`);

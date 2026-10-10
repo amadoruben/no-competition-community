@@ -64,6 +64,8 @@ export default async function Landing() {
   const { user, challenges, stats } = await liveData();
   if (user) redirect(homeFor(user));
   const demo = demoMode();
+  // An empty platform shows how decisions are made instead of a row of zeros.
+  const live = stats && stats.challenges + stats.projects > 0 ? stats : null;
 
   return (
     <div className="bg-paper">
@@ -84,9 +86,9 @@ export default async function Landing() {
           </div>
           <div className="grid gap-10 pt-14 pb-20 lg:grid-cols-[1.25fr_1fr] lg:items-end lg:pt-24 lg:pb-28">
             <div>
-              {stats && (
+              {live && (
                 <p className="mb-5 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[13px] text-white/80">
-                  <span className="size-1.5 rounded-full bg-volt" /> {stats.challenges} desafios · {stats.projects} projectos na comunidade
+                  <span className="size-1.5 rounded-full bg-volt" /> {live.challenges} desafios · {live.projects} projectos na comunidade
                 </p>
               )}
               <h1 className="font-display text-[44px] leading-[1.02] font-semibold sm:text-[64px] lg:text-[76px]">
@@ -104,13 +106,13 @@ export default async function Landing() {
                 </ButtonLink>
               </div>
             </div>
-            {stats && (
+            {live ? (
               <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl bg-white/10 ring-1 ring-white/10">
                 {[
-                  ["Desafios", stats.challenges],
-                  ["Projectos", stats.projects],
-                  ["Membros", stats.members],
-                  ["Submissões", stats.submissions],
+                  ["Desafios", live.challenges],
+                  ["Projectos", live.projects],
+                  ["Membros", live.members],
+                  ["Submissões", live.submissions],
                 ].map(([k, v]) => (
                   <div key={k} className="bg-ink/60 p-5 backdrop-blur">
                     <dt className="text-[12px] tracking-wide text-white/50 uppercase">{k}</dt>
@@ -118,6 +120,8 @@ export default async function Landing() {
                   </div>
                 ))}
               </dl>
+            ) : (
+              <CriteriaExample />
             )}
           </div>
         </div>
@@ -238,5 +242,43 @@ export default async function Landing() {
         {demo && " · Os dados apresentados são fictícios, para demonstração."}
       </footer>
     </div>
+  );
+}
+
+/** Illustration (not live data): how a submission is scored against public, weighted criteria. */
+function CriteriaExample() {
+  const rows = [
+    ["Problema e mercado", 30, 8],
+    ["Execução técnica", 30, 7],
+    ["Modelo de negócio", 25, 9],
+    ["Equipa", 15, 7],
+  ] as const;
+  const total = rows.reduce((t, [, w, n]) => t + (w * n) / 100, 0);
+  return (
+    <figure className="rounded-2xl bg-white/[0.06] p-5 ring-1 ring-white/10 backdrop-blur">
+      <figcaption className="flex items-center justify-between text-[12px] tracking-wide text-white/50 uppercase">
+        <span>Exemplo de avaliação</span>
+        <span>peso · nota</span>
+      </figcaption>
+      <ul className="mt-4 space-y-3">
+        {rows.map(([k, w, n]) => (
+          <li key={k}>
+            <div className="flex items-baseline justify-between gap-3 text-sm">
+              <span className="text-white/85">{k}</span>
+              <span className="tabular font-mono text-white/60">
+                {w}% · <span className="text-white">{n}</span>
+              </span>
+            </div>
+            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10">
+              <div className="h-full rounded-full bg-volt" style={{ width: `${n * 10}%` }} />
+            </div>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-5 flex items-end justify-between border-t border-white/10 pt-4">
+        <span className="text-[13px] text-white/60">Nota final ponderada</span>
+        <span className="tabular font-display text-4xl font-semibold text-volt">{total.toFixed(1).replace(".", ",")}</span>
+      </div>
+    </figure>
   );
 }

@@ -19,7 +19,7 @@ export default async function ReviewHome() {
     <div>
       <PageHeader eyebrow={`Olá, ${user.name.split(" ")[0]}`} title="As suas avaliações" description={pending ? `Tem ${pending} ${pending === 1 ? "submissão" : "submissões"} por avaliar.` : "Está em dia com todas as avaliações."} />
       {rows.length === 0 ? (
-        <Card><EmptyState icon={<ClipboardCheck className="size-5" />} title="Ainda não foi atribuído(a) a nenhum desafio">A investidora atribui avaliadores a cada desafio.</EmptyState></Card>
+        <Card><EmptyState icon={<ClipboardCheck className="size-5" />} title="Ainda não foi atribuído(a) a nenhum desafio">O investidor atribui avaliadores a cada desafio. Quando for atribuído(a), os trabalhos aparecem aqui.</EmptyState></Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {rows.map((r) => {

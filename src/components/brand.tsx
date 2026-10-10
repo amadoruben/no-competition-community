@@ -12,11 +12,16 @@ export function BrandMark({ size = 30, className }: { size?: number; className?:
   );
 }
 
-export function Brand({ href = "/", compact, className, invert }: { href?: string; compact?: boolean; className?: string; invert?: boolean }) {
+export function Brand({ href = "/", compact, stacked, className, invert }: { href?: string; compact?: boolean; stacked?: boolean; className?: string; invert?: boolean }) {
   return (
     <Link href={href} className={clsx("flex items-center gap-2.5", className)} aria-label="No Competition Community — início">
       <BrandMark />
-      {!compact && (
+      {stacked && !compact ? (
+        <span className="flex flex-col font-display leading-none">
+          <span className={clsx("text-[16px] font-bold tracking-tight", invert ? "text-white" : "text-ink")}>No Competition</span>
+          <span className={clsx("mt-1 text-[12px] font-medium", invert ? "text-white/60" : "text-muted")}>Community</span>
+        </span>
+      ) : !compact && (
         <span className={clsx("font-display text-[17px] leading-none font-bold tracking-tight", invert ? "text-white" : "text-ink")}>
           No Competition
           <span className={clsx("ml-1 font-medium", invert ? "text-white/60" : "text-muted")}>Community</span>

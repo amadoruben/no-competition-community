@@ -19,6 +19,8 @@ const schema = z
     STORAGE_BUCKET: z.string().default("ncc-files"),
     STORAGE_LOCAL_DIR: z.string().default("data/uploads"),
     APP_URL: z.url().optional(),
+    /** Comma-separated emails that become the investor (platform owner) once their email is verified. */
+    OWNER_EMAILS: z.string().optional(),
   })
   .superRefine((v, ctx) => {
     if (!v.DATABASE_URL) ctx.addIssue({ code: "custom", path: ["DATABASE_URL"], message: "required" });
@@ -81,4 +83,12 @@ export function demoMode() {
   if (flag === "1" || flag === "0") return flag === "1";
   if (process.env.VERCEL_ENV === "production") return false;
   return (process.env.APP_ENV ?? "development") !== "production";
+}
+
+/** Owner emails (lower-case). Read directly: also used where full config may be invalid. */
+export function ownerEmails(): string[] {
+  return (process.env.OWNER_EMAILS ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
 }

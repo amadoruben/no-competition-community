@@ -12,6 +12,8 @@ export interface AuthIdentity {
   email: string;
   /** Name given at sign-up, when the provider kept it (used to create the profile after email confirmation). */
   name?: string;
+  /** The provider has proven the person controls `email` (confirmed link). Gates OWNER_EMAILS. */
+  emailVerified?: boolean;
 }
 
 export type SignUpResult = { identity: AuthIdentity; needsEmailConfirmation: boolean };

@@ -15,6 +15,7 @@ import { setLessonComplete } from "@/server/learning";
 import { logger } from "@/server/logger";
 import { updateProfile } from "@/server/members";
 import { enroll, submitProject } from "@/server/participation";
+import { changeRole } from "@/server/people";
 import { addProjectMember, addProjectUpdate, createProject, removeProjectMember, updateProject } from "@/server/projects";
 import { confirmResults, publishResults, saveEvaluation, setSubmissionStatus, upsertOpportunity } from "@/server/review";
 import { currentUser, homeFor } from "@/server/session";
@@ -207,6 +208,12 @@ export async function setEvaluatorAction(challengeId: string, _: ActionState, fd
   const u = await actor();
   const assigned = str(fd, "assigned") === "1";
   return attempt(() => setEvaluator(u, challengeId, str(fd, "evaluatorId"), assigned), assigned ? "Avaliador(a) atribuído(a)." : "Avaliador(a) removido(a).");
+}
+
+export async function changeRoleAction(userId: string, _: ActionState, fd: FormData): Promise<ActionState> {
+  const u = await actor();
+  const role = str(fd, "role");
+  return attempt(() => changeRole(u, userId, role), role === "evaluator" ? "Passou a avaliador(a)." : "Passou a membro.");
 }
 
 export async function setSubmissionStatusAction(submissionId: string, _: ActionState, fd: FormData): Promise<ActionState> {

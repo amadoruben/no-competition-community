@@ -64,3 +64,20 @@ describe("profile after email confirmation", () => {
     expect(u.name).toBe("Joana Confirmada");
   });
 });
+
+describe("OWNER_EMAILS", () => {
+  it("promotes the owner to investor only once the email is verified", async () => {
+    process.env.OWNER_EMAILS = "other@x.test, Owner@T.test";
+    try {
+      const unverified = await resolveUser({ subject: "s-owner", email: "owner@t.test", name: "Dona" });
+      expect(unverified.role).toBe("member");
+      const verified = await resolveUser({ subject: "s-owner", email: "owner@t.test", emailVerified: true });
+      expect(verified.role).toBe("investor");
+      expect(verified.id).toBe(unverified.id);
+      const stranger = await resolveUser({ subject: "s-stranger", email: "stranger@t.test", emailVerified: true });
+      expect(stranger.role).toBe("member");
+    } finally {
+      delete process.env.OWNER_EMAILS;
+    }
+  });
+});

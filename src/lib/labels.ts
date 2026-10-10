@@ -13,7 +13,7 @@ export const STAGE_LABEL: Record<ProjectStage, string> = {
 export const ROLE_LABEL: Record<Role, string> = {
   member: "Membro",
   evaluator: "Avaliador(a)",
-  investor: "Investidora",
+  investor: "Investidor(a)",
 };
 
 export const PHASE_TONE: Record<ChallengePhase, Tone> = {

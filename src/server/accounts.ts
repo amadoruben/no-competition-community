@@ -5,6 +5,7 @@ import { users, type User } from "@/db/schema";
 import { slugify } from "@/lib/slug";
 import type { AuthIdentity } from "./auth/types";
 import { PASSWORD_MIN } from "./auth/passwords";
+import { ownerEmails } from "./config";
 import { conflict, forbidden, invalid } from "./errors";
 import { discard } from "./files";
 import { logger } from "./logger";
@@ -22,15 +23,27 @@ export const registerSchema = z.object({ name: text(2, 80, "Nome"), email: email
  */
 export async function resolveUser(identity: AuthIdentity, nameHint?: string): Promise<User> {
   const [bySubject] = await db.select().from(users).where(eq(users.authSubject, identity.subject)).limit(1);
-  if (bySubject) return bySubject;
+  if (bySubject) return ownerPromotion(bySubject, identity);
   const [byEmail] = await db.select().from(users).where(and(eq(users.email, identity.email), isNull(users.authSubject))).limit(1);
   if (byEmail) {
     const [linked] = await db.update(users).set({ authSubject: identity.subject }).where(eq(users.id, byEmail.id)).returning();
     logger.info("auth.linked", { userId: linked.id });
-    return linked;
+    return ownerPromotion(linked, identity);
   }
   const name = nameHint ?? identity.name ?? identity.email.split("@")[0];
-  return createMemberProfile(name, identity);
+  return ownerPromotion(await createMemberProfile(name, identity), identity);
+}
+
+/**
+ * OWNER_EMAILS: the platform owner becomes the investor on first sign-in, so a
+ * fresh deployment needs no CLI step. Only for an email the provider verified
+ * (a confirmed link), otherwise anyone could register the owner's address.
+ */
+async function ownerPromotion(u: User, identity: AuthIdentity): Promise<User> {
+  if (u.role === "investor" || !identity.emailVerified || !ownerEmails().includes(identity.email.toLowerCase())) return u;
+  const [promoted] = await db.update(users).set({ role: "investor" }).where(eq(users.id, u.id)).returning();
+  logger.info("auth.owner_promoted", { userId: u.id });
+  return promoted;
 }
 
 async function createMemberProfile(name: string, identity: AuthIdentity) {

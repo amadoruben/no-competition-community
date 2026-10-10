@@ -2,6 +2,7 @@ import { ArrowRight, CircleAlert, Plus, Sparkles } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ChallengeCard, PersonLine, PhaseBadge, phaseTimeline, PostRow, RankMedal, StageBadge } from "@/components/domain";
+import { FirstSteps } from "@/components/first-steps";
 import { Badge, ButtonLink, Card, CardHeader, cx, EmptyState, Notice, ProjectLogo } from "@/components/ui";
 import { timeAgo } from "@/lib/format";
 import { memberDashboard } from "@/server/dashboard";
@@ -19,10 +20,17 @@ export default async function Dashboard(props: PageProps<"/dashboard">) {
   const sp = await props.searchParams;
   const d = await memberDashboard(user);
   const overall = d.points.overall;
+  const steps = [
+    { done: !!(user.headline || user.bio), title: "Completar o perfil", detail: "Uma linha sobre si e as suas competências: é o que investidores e equipas vêem.", href: "/settings", cta: "Editar perfil" },
+    { done: d.projects.length > 0, title: "Criar o seu projecto", detail: "É o que vai submeter aos desafios e mostrar à comunidade.", href: "/projects/new", cta: "Criar projecto" },
+    { done: d.mine.length > 0, title: "Inscrever-se num desafio", detail: "Escolha um desafio aberto e leia os critérios de avaliação.", href: "/challenges", cta: "Ver desafios" },
+    { done: d.hasPosted, title: "Apresentar-se à comunidade", detail: "Uma publicação curta: quem é e o que está a construir.", href: "/community", cta: "Publicar" },
+  ];
+  const setupDone = steps.every((s) => s.done);
 
   return (
     <div className="space-y-6">
-      {sp.welcome && (
+      {sp.welcome && setupDone && (
         <Notice tone="ok">
           Conta criada. Comece por criar o seu projecto e inscrever-se num desafio aberto.
         </Notice>
@@ -33,6 +41,7 @@ export default async function Dashboard(props: PageProps<"/dashboard">) {
           <p className="text-sm text-muted">{greeting()},</p>
           <h1 className="font-display text-[32px] leading-tight font-semibold">{user.name.split(" ")[0]}</h1>
         </div>
+        {(overall || d.mine.length > 0) && (
         <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:min-w-[560px]">
           {[
             ["Posição geral", overall ? `${overall.rank}.º` : "—", overall ? `de ${d.points.totalMembers} membros` : "Ainda sem pontos"],
@@ -47,10 +56,14 @@ export default async function Dashboard(props: PageProps<"/dashboard">) {
             </div>
           ))}
         </dl>
+        )}
       </section>
+
+      <FirstSteps steps={steps} />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         <div className="min-w-0 space-y-6">
+          {(d.todos.length > 0 || setupDone) && (
           <Card>
             <CardHeader title="Precisa da sua atenção" subtitle="Próximos passos nos seus desafios e projectos" />
             {d.todos.length === 0 ? (
@@ -76,6 +89,7 @@ export default async function Dashboard(props: PageProps<"/dashboard">) {
               </ul>
             )}
           </Card>
+          )}
 
           <Card>
             <CardHeader title="Os meus desafios" action={<ButtonLink href="/challenges" variant="ghost" size="sm">Ver todos</ButtonLink>} />
@@ -149,7 +163,8 @@ export default async function Dashboard(props: PageProps<"/dashboard">) {
         <aside className="space-y-6">
           <Card>
             <CardHeader title="Classificação geral" action={<ButtonLink href="/leaderboard" variant="ghost" size="sm">Ver</ButtonLink>} />
-            <ul className="p-2">
+            {d.around.length === 0 && <p className="px-5 py-6 text-sm text-muted">Ainda ninguém pontuou. Os primeiros pontos chegam com as inscrições e submissões.</p>}
+            <ul className="p-2 empty:hidden">
               {d.around.map((r) => (
                 <li key={r.userId} className={cx("flex items-center gap-3 rounded-xl px-3 py-2", r.userId === user.id && "bg-volt-soft ring-1 ring-volt-strong/50")}>
                   <RankMedal rank={r.rank} />
@@ -181,7 +196,8 @@ export default async function Dashboard(props: PageProps<"/dashboard">) {
 
           <Card>
             <CardHeader title="Na comunidade" action={<ButtonLink href="/community" variant="ghost" size="sm">Abrir</ButtonLink>} />
-            <div className="divide-y divide-line/70">
+            {d.feed.length === 0 && <p className="px-5 py-6 text-sm text-muted">Sem publicações ainda. Seja a primeira pessoa a apresentar-se.</p>}
+            <div className="divide-y divide-line/70 empty:hidden">
               {d.feed.map((f) => (
                 <PostRow key={f.post.id} item={f} />
               ))}

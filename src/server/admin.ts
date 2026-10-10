@@ -1,6 +1,6 @@
 import { asc, count, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { challenges, evaluations, evaluatorAssignments, participations, results, submissions, type User } from "@/db/schema";
+import { challenges, evaluations, evaluatorAssignments, participations, results, submissions, users, type User } from "@/db/schema";
 import { challengePhase, type ChallengePhase } from "@/lib/challenge-state";
 import { forbidden } from "./errors";
 import { decisionHistory } from "./log";
@@ -102,9 +102,24 @@ async function challengeRows(viewer: User, onlyAssigned = false): Promise<Challe
 
 export async function investorOverview(actor: User) {
   assertInvestor(actor);
-  const [rows, opps, history] = await Promise.all([challengeRows(actor), listOpportunities(actor), decisionHistory(undefined, 8)]);
+  const [rows, opps, history, roles, [assigned]] = await Promise.all([
+    challengeRows(actor),
+    listOpportunities(actor),
+    decisionHistory(undefined, 8),
+    db.select({ role: users.role, n: count() }).from(users).where(eq(users.isDemo, actor.isDemo)).groupBy(users.role),
+    db.select({ n: count() }).from(evaluatorAssignments),
+  ]);
+  const people = (role: User["role"]) => roles.find((r) => r.role === role)?.n ?? 0;
   return {
     rows,
+    /** First-use checklist: what a fresh platform still needs from its owner. */
+    setup: {
+      challengeCreated: rows.length > 0,
+      challengePublished: rows.some((r) => r.status !== "draft"),
+      hasMembers: people("member") > 0,
+      hasEvaluators: people("evaluator") > 0,
+      evaluatorsAssigned: assigned.n > 0,
+    },
     kpis: {
       active: rows.filter((r) => ["open", "upcoming", "paused"].includes(r.phase)).length,
       toEvaluate: rows.filter((r) => r.status === "closed").reduce((s, r) => s + r.viewerPending, 0),

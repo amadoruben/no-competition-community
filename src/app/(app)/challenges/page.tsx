@@ -33,7 +33,7 @@ export default async function ChallengesPage(props: PageProps<"/challenges">) {
     <div>
       <PageHeader
         title="Desafios"
-        description="Problemas reais lançados pela investidora, com critérios, prazos e prémios públicos."
+        description="Problemas reais lançados pelo investidor, com critérios, prazos e prémios públicos."
         actions={user.role === "investor" && (
           <ButtonLink href="/admin/challenges/new" variant="accent">
             <Plus className="size-4" /> Novo desafio

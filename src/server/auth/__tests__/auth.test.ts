@@ -60,7 +60,7 @@ describe("LocalAuthProvider", () => {
 });
 
 describe("SupabaseAuthProvider (contract against the Supabase Auth HTTP API)", () => {
-  const user = { id: "6f1c0f7e-6a1b-4c6c-9a3b-1f2e3d4c5b6a", email: "ana@example.test", aud: "authenticated", role: "authenticated" };
+  const user = { id: "6f1c0f7e-6a1b-4c6c-9a3b-1f2e3d4c5b6a", email: "ana@example.test", email_confirmed_at: "2026-01-01T00:00:00Z", aud: "authenticated", role: "authenticated" };
   const session = { access_token: "a.b.c", refresh_token: "r", expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600, token_type: "bearer", user };
   const calls: string[] = [];
   const fakeFetch: typeof fetch = async (input, init) => {
@@ -84,7 +84,7 @@ describe("SupabaseAuthProvider (contract against the Supabase Auth HTTP API)", (
   beforeEach(() => jar.clear());
 
   it("maps sign-in success to an identity and stores the session in cookies", async () => {
-    expect(await sb.signIn("ana@example.test", "good-password")).toEqual({ subject: user.id, email: user.email });
+    expect(await sb.signIn("ana@example.test", "good-password")).toEqual({ subject: user.id, email: user.email, emailVerified: true });
     expect([...jar.keys()].some((k) => k.startsWith("sb-"))).toBe(true);
     expect((await sb.currentIdentity())?.subject).toBe(user.id);
     expect(calls).toContain("GET /auth/v1/user"); // identity is validated server-side, not read from the cookie
@@ -101,7 +101,7 @@ describe("SupabaseAuthProvider (contract against the Supabase Auth HTTP API)", (
   });
 
   it("confirms an email link by token_hash (works on any device)", async () => {
-    expect(await sb.exchangeCallback({ tokenHash: "good-hash", type: "email" })).toEqual({ subject: user.id, email: user.email });
+    expect(await sb.exchangeCallback({ tokenHash: "good-hash", type: "email" })).toEqual({ subject: user.id, email: user.email, emailVerified: true });
     expect(calls).toContain("POST /auth/v1/verify");
     expect([...jar.keys()].some((k) => k.startsWith("sb-"))).toBe(true); // signed in after confirming
     expect(await errKind(sb.exchangeCallback({ tokenHash: "stale-hash", type: "email" }))).toBe("invalid");
@@ -192,7 +192,7 @@ describe("SupabaseAuthProvider: confirmation and account deletion", () => {
   it("keeps the name at the provider so the profile can be created after confirmation", async () => {
     const r = await sb.signUp("nova@example.test", "a-good-password", { confirmRedirect: "https://app.test/auth/callback", name: "Nova Pessoa" });
     expect(calls[0].body).toMatchObject({ data: { name: "Nova Pessoa" } });
-    expect(r).toEqual({ identity: { subject: id, email: "nova@example.test", name: "Nova Pessoa" }, needsEmailConfirmation: true });
+    expect(r).toEqual({ identity: { subject: id, email: "nova@example.test", emailVerified: false, name: "Nova Pessoa" }, needsEmailConfirmation: true });
   });
 
   it("resends the confirmation email", async () => {

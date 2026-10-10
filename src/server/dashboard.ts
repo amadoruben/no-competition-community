@@ -1,6 +1,6 @@
-import { desc, inArray } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { projectUpdates, type User } from "@/db/schema";
+import { posts, projectUpdates, type User } from "@/db/schema";
 import { challengePhase } from "@/lib/challenge-state";
 import { daysUntil } from "@/lib/format";
 import { listChallenges } from "./challenges";
@@ -17,11 +17,12 @@ export interface Todo {
 }
 
 export async function memberDashboard(user: User) {
-  const [challengeList, projects, points, feed] = await Promise.all([
+  const [challengeList, projects, points, feed, [posted]] = await Promise.all([
     listChallenges(user),
     projectsForUser(user.id),
     memberPoints(user.id),
     listFeed(user, { limit: 4 }),
+    db.select({ id: posts.id }).from(posts).where(eq(posts.authorId, user.id)).limit(1),
   ]);
   const challenges = challengeList.map((c) => ({ ...c, phase: challengePhase(c) }));
   const mine = challenges.filter((c) => c.viewerEnrolled);
@@ -49,8 +50,6 @@ export async function memberDashboard(user: User) {
     if (c.phase === "upcoming")
       todos.push({ key: `prep-${c.id}`, title: `Preparar “${c.title}”`, detail: "O desafio abre em breve — reveja os critérios", href: `/challenges/${c.slug}`, urgent: false });
   }
-  if (projects.length === 0)
-    todos.push({ key: "project", title: "Criar o seu primeiro projecto", detail: "É o que vai submeter aos desafios", href: "/projects/new", urgent: false });
   for (const p of projects) {
     const last = lastUpdates.find((u) => u.projectId === p.id)?.at;
     if (!last || daysUntil(last) < -14)
@@ -69,5 +68,6 @@ export async function memberDashboard(user: User) {
     points,
     around,
     feed: feed.items,
+    hasPosted: !!posted,
   };
 }

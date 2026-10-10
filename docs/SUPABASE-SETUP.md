@@ -77,11 +77,11 @@ O que o `supabase:check` verifica, sem mostrar valores: que os cinco valores sã
 1. `http://localhost:3000/register` → criar conta com **o seu** email.
 2. Se *Confirm email* estiver ligado: abrir o email do Supabase → o link passa por `/auth/callback` e entra no painel. Se estiver desligado: entra directamente.
 3. Terminar sessão → `/login` com a mesma conta. Testar também `/forgot-password`.
-4. Tornar-se investidor (não há forma de o fazer pela web, por segurança):
+4. Tornar-se investidor: definir `OWNER_EMAILS=o.seu@email.pt` (separados por vírgulas para várias pessoas). Ao entrar com esse email **confirmado**, a conta passa a investidor. Só funciona com *Confirm email* ligado — o `supabase:check` dá erro se estiver desligado, porque então qualquer pessoa podia registar esse endereço. Alternativa sem variável:
    ```bash
    npm run user:role -- o.seu@email.pt investor
    ```
-   Voltar a entrar: aparece o painel do investidor (`/admin`). Para avaliadores: `… avaliador@… evaluator`.
+   Voltar a entrar: aparece o painel do investidor (`/admin`). Os avaliadores nomeiam-se pela web, em **Membros e papéis** (`/admin/people`).
 5. Confirmar no Supabase: **Authentication → Users** mostra a conta; **Table Editor → users** mostra o perfil com o mesmo email.
 
 Dados de demonstração **não** devem ir para um projecto que venha a ser de produção. Se este projecto for só de demonstração: `APP_ENV=demo npm run db:seed` e `DEMO_MODE=1`.
