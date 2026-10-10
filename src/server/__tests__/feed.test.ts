@@ -175,6 +175,8 @@ describe("demo and real accounts", () => {
     const p = await createPost(demo, post({ body: "Publicação de demonstração" }));
     expect((await listFeed(real)).items.some((i) => i.post.id === p.id)).toBe(false);
     expect((await listFeed(demo)).items.some((i) => i.post.id === p.id)).toBe(true);
-    for (const attempt of [getPost(real, p.id), toggleReaction(real, p.id), toggleSaved(real, p.id), addComment(real, p.id, "Olá")]) expect(await code(attempt)).toBe("not_found");
+    // One at a time, each handled as it starts (on a real server they would otherwise race).
+    for (const attempt of [() => getPost(real, p.id), () => toggleReaction(real, p.id), () => toggleSaved(real, p.id), () => addComment(real, p.id, "Olá")])
+      expect(await code(attempt())).toBe("not_found");
   });
 });
