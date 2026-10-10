@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import { readMigrationFiles } from "drizzle-orm/migrator";
 import { migrate as migratePglite } from "drizzle-orm/pglite/migrator";
 import { migrate as migratePostgres } from "drizzle-orm/node-postgres/migrator";
 import path from "node:path";
@@ -7,6 +8,15 @@ import type { DbHandle } from "./index";
 
 export const MIGRATIONS_DIR = path.join(process.cwd(), "drizzle");
 const LOCK_KEY = 772001; // arbitrary, constant: serialises concurrent migrators
+
+/** Content hash of the repository's newest migration (what PRODUCTION_APPROVED_MIGRATION is compared with). */
+export function latestMigrationHash(folder = MIGRATIONS_DIR): string | undefined {
+  try {
+    return readMigrationFiles({ migrationsFolder: folder }).at(-1)?.hash;
+  } catch {
+    return undefined;
+  }
+}
 
 /**
  * Apply pending versioned migrations (idempotent; tracked in

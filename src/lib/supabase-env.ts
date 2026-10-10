@@ -172,20 +172,33 @@ export function inspectKey(key: string | undefined): KeyInfo | null {
 export const PRODUCTION_SUPABASE_REF_DEFAULT = "nbexcezniqczbxlkephk";
 
 /**
+ * The newest migration the owner authorized for the Production database, by
+ * content hash (sha256 of the SQL, as Drizzle records it). Until Preview has its
+ * own project, a Preview may share the Production database only while this is
+ * the repository's newest migration: a new or edited migration blocks it again
+ * until the owner authorizes it and this hash is updated.
+ * Authorized: 0005_follows_stories_social (additive: one table, three columns).
+ */
+export const PRODUCTION_APPROVED_MIGRATION = "da9b6defa5286d3d72b012ea55d04eaa12bb91eebaa5ad5729c5a486f64162db";
+
+/**
  * Why a Preview deployment must not touch this database (migrations, seeding,
  * buckets), or null when it may. Production, local and test runs are never
  * blocked here: only VERCEL_ENV=preview pointing at the Production project,
- * through its public URL or through the database URL used for migrations.
+ * through its public URL or through the database URL used for migrations, with
+ * migrations the owner has not authorized for Production (`latestMigration` is
+ * the hash of the repository's newest one; unknown counts as unauthorized).
  */
-export function previewTargetsProduction(env: Env): string | null {
+export function previewTargetsProduction(env: Env, latestMigration?: string): string | null {
   if (env.VERCEL_ENV !== "preview") return null;
   const prodRef = clean(env.PRODUCTION_SUPABASE_REF) ?? PRODUCTION_SUPABASE_REF_DEFAULT;
   const refs = [projectRefFromUrl(supabaseUrl(env)), inspectDbUrl(databaseUrlFrom(env))?.ref, inspectDbUrl(migrationDatabaseUrl(env))?.ref];
   if (!refs.includes(prodRef)) return null;
-  return `This Preview deployment points at the Production Supabase project (${prodRef}). Nothing was migrated. Give Preview its own project: docs/PREVIEW-DATABASE.md.`;
+  if (latestMigration && latestMigration === PRODUCTION_APPROVED_MIGRATION) return null;
+  return `This Preview deployment points at the Production Supabase project (${prodRef}) and its migrations are not authorized for Production. Nothing was migrated. Get the owner's authorization (PRODUCTION_APPROVED_MIGRATION) or give Preview its own project: docs/PREVIEW-DATABASE.md.`;
 }
 
-export function analyseSupabaseEnv(env: Env): { ref: string | null; findings: Finding[] } {
+export function analyseSupabaseEnv(env: Env, latestMigration?: string): { ref: string | null; findings: Finding[] } {
   const f: Finding[] = [];
   const add = (level: Finding["level"], message: string) => f.push({ level, message });
 
@@ -200,8 +213,9 @@ export function analyseSupabaseEnv(env: Env): { ref: string | null; findings: Fi
   // test data into real data.
   const prodRef = clean(env.PRODUCTION_SUPABASE_REF) ?? PRODUCTION_SUPABASE_REF_DEFAULT;
   if (env.VERCEL_ENV === "preview") {
-    const blocked = previewTargetsProduction(env);
+    const blocked = previewTargetsProduction(env, latestMigration);
     if (blocked) add("error", blocked);
+    else if (ref === prodRef) add("warn", `Preview shares the Production Supabase project (${prodRef}); its migrations are authorized for Production.`);
     else if (ref) add("ok", `Preview uses its own Supabase project (${ref}), not Production (${prodRef})`);
   }
 

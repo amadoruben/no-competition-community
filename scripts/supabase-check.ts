@@ -22,7 +22,7 @@ import { readMigrationFiles } from "drizzle-orm/migrator";
 import { randomBytes, randomUUID } from "node:crypto";
 import { openDatabase } from "../src/db";
 import { assertOwnDatabase, OWN_TABLES } from "../src/db/guard";
-import { MIGRATIONS_DIR } from "../src/db/migrate";
+import { latestMigrationHash, MIGRATIONS_DIR } from "../src/db/migrate";
 import {
   analyseSupabaseEnv,
   databaseUrlFrom,
@@ -233,7 +233,7 @@ async function main() {
     }
   }
   console.log("\n1. Configuration");
-  const { ref, findings } = analyseSupabaseEnv(env);
+  const { ref, findings } = analyseSupabaseEnv(env, latestMigrationHash());
   for (const f of findings) report(f.level, f.message);
   if (findings.some((f) => f.level === "error")) {
     console.log("\nFix the configuration above first.");

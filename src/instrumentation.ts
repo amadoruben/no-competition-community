@@ -19,9 +19,9 @@ export async function register() {
   const auto = process.env.DB_AUTO_MIGRATE ?? (process.env.NODE_ENV === "production" ? "0" : "1");
   if (auto === "1") {
     const { dbHandle, openDatabase } = await import("./db");
-    const { runMigrations } = await import("./db/migrate");
+    const { latestMigrationHash, runMigrations } = await import("./db/migrate");
     const { migrationDatabaseUrl, previewTargetsProduction } = await import("./lib/supabase-env");
-    const blocked = previewTargetsProduction(process.env);
+    const blocked = previewTargetsProduction(process.env, latestMigrationHash());
     if (blocked) {
       const { logger } = await import("./server/logger");
       logger.error("migrations.blocked", { reason: blocked });

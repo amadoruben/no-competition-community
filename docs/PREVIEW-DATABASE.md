@@ -62,6 +62,16 @@ Um build ou servidor com `VERCEL_ENV=preview` que aponte para o projecto de Prod
 
 Consequência: enquanto a Preview usar a base partilhada, um push para esta branch produz um deploy de Preview **falhado** (com a mensagem acima) e a base de Production fica intacta. A Preview só volta a ficar disponível depois dos passos manuais acima.
 
+### Excepção autorizada pelo dono (base partilhada)
+
+O dono autorizou aplicar a migração **0005** (aditiva: tabela `follows` e as colunas `reactions.kind`, `users.social_links`, `lessons.created_at`) na base de Production, para poder rever o novo design na Preview sem criar outro projecto. `PRODUCTION_APPROVED_MIGRATION` em `src/lib/supabase-env.ts` guarda o hash do conteúdo dessa migração:
+
+- enquanto a migração mais recente do repositório for exactamente essa, a Preview pode usar a base partilhada;
+- uma migração nova (0006…) ou uma 0005 editada volta a bloquear a Preview até nova autorização do dono, que actualiza esse hash;
+- a versão em Production continua compatível: só se acrescentou, nada foi apagado ou alterado.
+
+Na Preview partilhada não se fazem testes que escrevam dados; serve para rever o visual e a navegação.
+
 ## Depois (pelo agente)
 
 1. Novo deploy da Preview (push autorizado). O build:

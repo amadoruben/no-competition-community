@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { analyseSupabaseEnv, databaseUrlFrom, previewTargetsProduction, PRODUCTION_SUPABASE_REF_DEFAULT, inspectDbUrl, inspectKey, migrationDatabaseUrl, secretKey, sslFor, supabaseUrl } from "../supabase-env";
+import { latestMigrationHash } from "@/db/migrate";
+import { analyseSupabaseEnv, databaseUrlFrom, PRODUCTION_APPROVED_MIGRATION, previewTargetsProduction, PRODUCTION_SUPABASE_REF_DEFAULT,inspectDbUrl, inspectKey, migrationDatabaseUrl, secretKey, sslFor, supabaseUrl } from "../supabase-env";
 
 // Fictitious refs and keys: shaped like Supabase's, valid nowhere.
 const A = "aaaaaaaaaaaaaaaaaaaa";
@@ -46,6 +47,17 @@ describe("supabase env analysis", () => {
     expect(previewTargetsProduction({ ...prodEverywhere, VERCEL_ENV: "production" })).toBeNull();
     expect(previewTargetsProduction(prodEverywhere)).toBeNull();
     expect(previewTargetsProduction({ ...good, VERCEL_ENV: "preview" })).toBeNull();
+  });
+
+  it("lets a Preview share Production only while the newest migration is the one the owner authorized", () => {
+    const P = PRODUCTION_SUPABASE_REF_DEFAULT;
+    const preview = { VERCEL_ENV: "preview", POSTGRES_URL: good.DATABASE_URL.replace(A, P) };
+    expect(previewTargetsProduction(preview, PRODUCTION_APPROVED_MIGRATION)).toBeNull();
+    // A new or edited migration (another hash) is blocked again, and so is an unknown one.
+    expect(previewTargetsProduction(preview, "0".repeat(64))).toContain("not authorized");
+    expect(previewTargetsProduction(preview)).not.toBeNull();
+    // The real repository: its newest migration is the authorized one.
+    expect(latestMigrationHash()).toBe(PRODUCTION_APPROVED_MIGRATION);
   });
 
   it("catches a database URL from another project", () => {

@@ -4,11 +4,11 @@
  */
 import { hasPasswordPlaceholder, migrationDatabaseUrl, previewTargetsProduction } from "../lib/supabase-env";
 import { openDatabase } from "./index";
-import { runMigrations } from "./migrate";
+import { latestMigrationHash, runMigrations } from "./migrate";
 
 async function main() {
   // Checked first, even with --skip-if-unconfigured: a Preview must fail rather than migrate Production.
-  const blocked = previewTargetsProduction(process.env);
+  const blocked = previewTargetsProduction(process.env, latestMigrationHash());
   if (blocked) {
     console.error(`Migrations not applied: ${blocked}`);
     process.exit(1);
