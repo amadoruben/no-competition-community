@@ -18,6 +18,7 @@ A comunidade oficial da marca No Competition: os seguidores tornam-se membros ac
 
 > Os dados de demonstração são **fictícios**.
 
+- **Lançamento (o que falta, por ordem):** [`docs/LAUNCH.md`](docs/LAUNCH.md) · base exclusiva da Preview: [`docs/PREVIEW-DATABASE.md`](docs/PREVIEW-DATABASE.md)
 - Arquitectura e versões: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - **Ligar ao Supabase (passo a passo):** [`docs/SUPABASE-SETUP.md`](docs/SUPABASE-SETUP.md)
 - Deploy, backups, monitorização, email (SMTP), **diagnóstico** e mudança de fornecedor: [`docs/OPERATIONS.md`](docs/OPERATIONS.md)

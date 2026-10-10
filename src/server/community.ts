@@ -73,6 +73,11 @@ export async function createPost(actor: User, input: unknown) {
   const v = parse(postInput, input);
   if (v.kind === "announcement" && !isInvestor(actor)) throw forbidden("Apenas a equipa No Competition pode publicar anúncios oficiais.");
   if (v.projectId && !(await isProjectMember(actor.id, v.projectId))) throw forbidden("Só pode associar projectos de que faz parte.");
+  if (v.challengeId && !isInvestor(actor)) {
+    // A draft challenge is not public yet: linking it would reveal its title in the feed.
+    const [c] = await db.select({ status: challenges.status }).from(challenges).where(eq(challenges.id, v.challengeId)).limit(1);
+    if (!c || c.status === "draft") throw notFound("Desafio não encontrado.");
+  }
   const [p] = await db
     .insert(posts)
     .values({ ...v, authorId: actor.id, pinned: v.kind === "announcement" })

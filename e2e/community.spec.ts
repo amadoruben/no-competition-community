@@ -69,3 +69,32 @@ test("Início: members post, the admin moderates, the profile shows the activity
   await mem.goto("/dashboard");
   await expect(mem.getByRole("link", { name: title })).toHaveCount(0);
 });
+
+test("first content: the admin's welcome announcement is pinned and official for members", async ({ browser }) => {
+  const title = `Bem-vindos à comunidade ${Date.now()}`;
+  const inv = await loginAs(browser, INVESTOR);
+  await inv.goto("/dashboard");
+  await inv.getByRole("button", { name: /Escreva algo para a comunidade/ }).click();
+  await inv.getByLabel("Tipo").selectOption("announcement");
+  await inv.getByLabel("Título").fill(title);
+  await inv.getByLabel("Texto").fill("Esta é a comunidade oficial da No Competition.");
+  await inv.getByRole("button", { name: "Publicar" }).click();
+  await expect(inv.getByRole("link", { name: title })).toBeVisible();
+
+  const mem = await loginAs(browser, MEMBER);
+  await mem.goto("/dashboard?f=announcement");
+  const first = mem.getByRole("link", { name: title });
+  await expect(first).toBeVisible();
+  const card = mem.locator("div", { has: first }).last();
+  await expect(card.getByText("No Competition", { exact: true })).toBeVisible();
+  await expect(card.getByText("Fixado")).toBeVisible();
+  // Members never get the "official announcement" option.
+  await mem.getByRole("button", { name: /Escreva algo para a comunidade/ }).click();
+  await expect(mem.getByLabel("Tipo").locator('option[value="announcement"]')).toHaveCount(0);
+
+  await inv.goto("/dashboard");
+  const own = inv.locator("div", { has: inv.getByRole("link", { name: title }) }).last();
+  await own.getByRole("button", { name: "Remover publicação" }).click();
+  await inv.getByRole("dialog").getByRole("button", { name: "Remover" }).click();
+  await expect(inv.getByRole("link", { name: title })).toHaveCount(0);
+});

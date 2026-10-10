@@ -26,6 +26,14 @@ describe("supabase env analysis", () => {
     expect(text).not.toContain("key-secret-2");
   });
 
+  it("refuses a Preview deployment that points at the Production project", () => {
+    expect(errors({ ...good, VERCEL_ENV: "preview", PRODUCTION_SUPABASE_REF: A }).join()).toContain("uses the Production Supabase project");
+    expect(errors({ ...good, VERCEL_ENV: "preview", PRODUCTION_SUPABASE_REF: B })).toEqual([]);
+    // Production itself and unconfigured deployments are not affected.
+    expect(errors({ ...good, VERCEL_ENV: "production", PRODUCTION_SUPABASE_REF: A })).toEqual([]);
+    expect(errors({ ...good, VERCEL_ENV: "preview" })).toEqual([]);
+  });
+
   it("catches a database URL from another project", () => {
     expect(errors({ ...good, DATABASE_URL: good.DATABASE_URL.replace(A, B) }).join()).toContain(`belongs to project ${B}`);
   });
