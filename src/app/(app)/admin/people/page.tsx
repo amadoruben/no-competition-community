@@ -40,7 +40,7 @@ export default async function PeoplePage(props: PageProps<"/admin/people">) {
                 <div className="flex flex-wrap items-center gap-2">
                   <Link href={`/members/${p.handle}`} className="truncate font-medium hover:underline">{p.name}</Link>
                   <RoleTag role={p.role} />
-                  {p.accessTier === "full" && p.role !== "investor" && <Badge tone="volt" className="h-5 px-2 text-[11px]">Acesso completo</Badge>}
+                  {p.accessTier === "full" && p.role !== "investor" && <Badge tone="gold" className="h-5 px-2 text-[11px]">Acesso completo</Badge>}
                   {p.id === user.id && <span className="text-[12px] text-muted">(você)</span>}
                 </div>
                 <div className="truncate text-[13px] text-muted">

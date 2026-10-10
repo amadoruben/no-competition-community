@@ -6,6 +6,7 @@ import { challengePhase, PHASE_LABEL, type ChallengePhase } from "@/lib/challeng
 import { deadlineText, fmtDay, timeAgo } from "@/lib/format";
 import { PHASE_TONE, ROLE_LABEL, STAGE_LABEL } from "@/lib/labels";
 import type { Project, ProjectStage, Role } from "@/db/schema";
+import { Art } from "./art";
 import { Avatar, Badge, Card, ChallengeCover, cx, ProjectLogo } from "./ui";
 
 export { ChallengeCover };
@@ -124,7 +125,7 @@ export function RoleTag({ role }: { role: Role }) {
   if (role === "member") return null;
   if (role === "investor")
     return (
-      <Badge tone="volt" className="h-5 px-2 text-[11px]">
+      <Badge tone="gold" className="h-5 px-2 text-[11px]">
         <BadgeCheck className="size-3" /> No Competition
       </Badge>
     );
@@ -133,7 +134,7 @@ export function RoleTag({ role }: { role: Role }) {
 
 export function ScorePill({ score, className }: { score: number | null; className?: string }) {
   if (score === null) return <span className={cx("tabular text-sm text-muted", className)}>—</span>;
-  const tone = score >= 80 ? "bg-ok-soft text-ok" : score >= 65 ? "bg-volt-soft text-ink" : score >= 50 ? "bg-warn-soft text-warn" : "bg-bad-soft text-bad";
+  const tone = score >= 80 ? "bg-ok-soft text-ok" : score >= 65 ? "bg-gold-soft text-ink" : score >= 50 ? "bg-warn-soft text-warn" : "bg-bad-soft text-bad";
   return (
     <span className={cx("tabular inline-flex h-7 min-w-12 items-center justify-center rounded-lg px-2 text-sm font-semibold", tone, className)}>
       {score.toFixed(1).replace(".", ",")}
@@ -143,7 +144,7 @@ export function ScorePill({ score, className }: { score: number | null; classNam
 
 export function RankMedal({ rank }: { rank: number }) {
   const style =
-    rank === 1 ? "bg-volt text-ink" : rank === 2 ? "bg-ink text-white" : rank === 3 ? "bg-sunken text-ink ring-1 ring-line-strong" : "bg-transparent text-muted";
+    rank === 1 ? "bg-gold text-ink" : rank === 2 ? "bg-ink text-white" : rank === 3 ? "bg-sunken text-ink ring-1 ring-line-strong" : "bg-transparent text-muted";
   return (
     <span className={cx("tabular inline-grid size-8 shrink-0 place-items-center rounded-full font-mono text-[13px] font-semibold", style)}>
       {rank}
@@ -162,6 +163,40 @@ export function PostRow({ item }: { item: FeedItem }) {
           <span className="truncate">{item.authorName.split(" ")[0]}</span>
           <span>· {timeAgo(item.post.createdAt)}</span>
           <span className="flex items-center gap-0.5">· <MessageCircle className="size-3" /> {item.commentCount}</span>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+/**
+ * Compact challenge card for carousels: cover with theme and phase, the main
+ * prize as published (with its medal), the title and what happens next.
+ */
+export function ChallengeTile({ c, href }: { c: ChallengeCardData & { phase?: ChallengePhase }; href?: string }) {
+  const phase = c.phase ?? challengePhase(c);
+  return (
+    <Link href={href ?? `/challenges/${c.slug}`} className="group block h-full rounded-[18px]">
+      <div className="flex h-full flex-col overflow-hidden rounded-[18px] bg-surface shadow-[var(--shadow-card)] ring-1 ring-line/80 transition duration-200 group-hover:-translate-y-0.5 group-hover:shadow-[var(--shadow-pop)]">
+        <ChallengeCover hue={c.coverHue} seed={c.slug} theme={`${c.category} ${c.title}`} className="aspect-[16/9]">
+          <div className="flex h-full flex-col justify-between p-2.5">
+            <div className="flex items-start justify-between gap-2">
+              <span className="truncate rounded-full bg-black/35 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur">{c.category}</span>
+              <PhaseBadge phase={phase} />
+            </div>
+            {c.topPrize?.value && (
+              <span className="inline-flex items-center gap-1.5 self-start rounded-full bg-white/95 py-0.5 pr-3 pl-1 text-[13px] font-semibold text-ink shadow-sm">
+                <Art name="trophy" size={22} />
+                {c.topPrize.value}
+              </span>
+            )}
+          </div>
+        </ChallengeCover>
+        <div className="flex flex-1 flex-col p-3.5">
+          <h3 className="line-clamp-2 text-[15px] leading-snug font-semibold group-hover:underline">{c.title}</h3>
+          <p className={cx("mt-auto flex items-center gap-1.5 pt-2 text-[12.5px]", phase === "open" ? "font-medium text-ink" : "text-muted")}>
+            <CalendarClock className="size-3.5 shrink-0" /> {phaseTimeline(c, phase)}
+          </p>
         </div>
       </div>
     </Link>

@@ -15,14 +15,18 @@ export function Carousel({
   action,
   children,
   itemClassName,
+  headingLevel = 2,
 }: {
   title: string;
   subtitle?: ReactNode;
   action?: ReactNode;
   children: ReactNode[];
   itemClassName?: string;
+  /** 3 when the carousel sits under a section's own heading. */
+  headingLevel?: 2 | 3;
 }) {
   const label = title;
+  const Heading = headingLevel === 3 ? "h3" : "h2";
   const row = useRef<HTMLUListElement>(null);
   const [edge, setEdge] = useState({ start: true, end: true });
   const update = useCallback(() => {
@@ -47,7 +51,7 @@ export function Carousel({
     <section aria-roledescription="carrossel" aria-label={label}>
       <div className="mb-3 flex items-end justify-between gap-4">
         <div className="min-w-0">
-          <h2 className="font-display text-[20px] leading-tight font-semibold">{title}</h2>
+          <Heading className="font-display text-[20px] leading-tight font-bold">{title}</Heading>
           {subtitle && <p className="mt-0.5 text-[13px] text-muted">{subtitle}</p>}
         </div>
         <div className="flex shrink-0 items-center gap-2">

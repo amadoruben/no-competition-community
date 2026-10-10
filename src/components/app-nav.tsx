@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Role } from "@/db/schema";
 import { mainItems, toolsFor } from "@/lib/nav";
+import { Avatar } from "./ui";
 
 /** Desktop: the five areas as tabs in the header. */
 export function TopNav({ handle }: { handle: string }) {
@@ -23,11 +24,11 @@ export function TopNav({ handle }: { handle: string }) {
                 aria-current={active ? "page" : undefined}
                 className={clsx(
                   "relative flex items-center gap-2 rounded-md px-3 text-[14px] font-medium transition-colors",
-                  "after:absolute after:inset-x-3 after:bottom-0 after:h-[3px] after:rounded-full after:transition-colors",
-                  active ? "text-ink after:bg-ink" : "text-muted after:bg-transparent hover:text-ink",
+                  "after:absolute after:inset-x-3 after:bottom-0 after:h-[2.5px] after:rounded-full after:transition-colors",
+                  active ? "text-ink after:bg-gold" : "text-muted after:bg-transparent hover:text-ink",
                 )}
               >
-                <Icon className="size-[18px]" strokeWidth={active ? 2.3 : 1.9} />
+                <Icon className={clsx("size-[18px]", active && "text-gold-strong")} strokeWidth={active ? 2.2 : 1.8} />
                 {item.label}
               </Link>
             </li>
@@ -52,7 +53,7 @@ export function ToolsLink({ role }: { role: Role }) {
       aria-current={active ? "page" : undefined}
       className={clsx(
         "hidden h-9 items-center gap-2 rounded-full px-3.5 text-[13px] font-medium ring-1 transition-colors ring-inset lg:inline-flex",
-        active ? "bg-ink text-white ring-ink" : "bg-surface text-ink ring-line-strong hover:bg-sunken",
+        active ? "bg-gold-soft text-ink ring-gold" : "bg-surface text-ink ring-line-strong hover:bg-mist",
       )}
     >
       <Icon className="size-4" /> {label}
@@ -75,10 +76,10 @@ export function AdminNav() {
             aria-current={active ? "page" : undefined}
             className={clsx(
               "-mb-px flex h-11 items-center gap-2 border-b-2 px-3 text-sm font-medium whitespace-nowrap transition-colors",
-              active ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink",
+              active ? "border-gold text-ink" : "border-transparent text-muted hover:text-ink",
             )}
           >
-            <Icon className="size-4" /> {t.label}
+            <Icon className={clsx("size-4", active && "text-gold-strong")} /> {t.label}
           </Link>
         );
       })}
@@ -86,25 +87,34 @@ export function AdminNav() {
   );
 }
 
-/** Phones and tablets: the five areas in a bottom bar, within thumb reach. */
-export function MobileTabs({ handle }: { handle: string }) {
+/**
+ * Phones and tablets: the five areas in a floating bar within thumb reach,
+ * each with its name under the icon, your photo for Perfil, and a gold mark on
+ * the current area.
+ */
+export function MobileTabs({ handle, me }: { handle: string; me: { name: string; hue: number; fileId: string | null } }) {
   const pathname = usePathname();
   return (
-    <nav aria-label="Secções" className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
-      <ul className="mx-auto grid max-w-lg grid-cols-5">
+    <nav aria-label="Secções" className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(10px,env(safe-area-inset-bottom))] lg:hidden">
+      <ul className="pointer-events-auto mx-auto grid max-w-[460px] grid-cols-5 rounded-[26px] bg-surface/92 px-1.5 py-1.5 shadow-[0_18px_40px_-14px_rgb(22_19_14/0.35),0_2px_8px_-2px_rgb(22_19_14/0.12)] ring-1 ring-line/90 backdrop-blur-xl">
         {mainItems(handle).map((item) => {
           const active = item.match(pathname);
           const Icon = item.icon;
+          const profile = item.href === "/profile";
           return (
             <li key={item.href}>
               <Link
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className={clsx("flex h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium", active ? "text-ink" : "text-muted")}
+                className={clsx("flex h-[54px] flex-col items-center justify-center gap-0.5 rounded-[20px] text-[11px] transition-colors", active ? "bg-gold-soft font-semibold text-ink" : "font-medium text-muted active:bg-sunken")}
               >
-                <span className={clsx("grid h-7 w-12 place-items-center rounded-full transition-colors", active && "bg-volt")}>
-                  <Icon className="size-[19px]" strokeWidth={active ? 2.4 : 1.9} />
-                </span>
+                {profile ? (
+                  <span className={clsx("rounded-full", active ? "ring-2 ring-gold" : "ring-1 ring-line")}>
+                    <Avatar name={me.name} hue={me.hue} fileId={me.fileId} size={22} />
+                  </span>
+                ) : (
+                  <Icon className={clsx("size-[22px]", active && "text-gold-strong")} strokeWidth={active ? 2.3 : 1.8} />
+                )}
                 {item.label}
               </Link>
             </li>

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { DomainError } from "@/server/errors";
 import { fileForServing } from "@/server/files";
 import { currentUser } from "@/server/session";
+import { isPublicFile } from "@/server/social";
 import { storage } from "@/server/storage";
 
 /**
@@ -9,8 +10,10 @@ import { storage } from "@/server/storage";
  * short-lived signed URL when the provider offers one, otherwise streams.
  */
 export async function GET(_: Request, ctx: RouteContext<"/files/[id]">) {
-  if (!(await currentUser())) return new NextResponse("Unauthorized", { status: 401 });
   const { id } = await ctx.params;
+  // Files need a session, except the covers of social publications the team shows on the public page.
+  const signedIn = !!(await currentUser());
+  if (!signedIn && !(await isPublicFile(id))) return new NextResponse("Unauthorized", { status: 401 });
   try {
     const file = await fileForServing(id);
     const s = storage();

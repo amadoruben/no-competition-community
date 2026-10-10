@@ -1,6 +1,7 @@
-import { Award, CalendarClock, Check, ClipboardCheck, ExternalLink, FileText, Gauge, Lock, Pencil, Trophy, Users } from "lucide-react";
+import { CalendarClock, Check, ClipboardCheck, ExternalLink, FileText, Gauge, Lock, Pencil, Users } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Art, prizeArt } from "@/components/art";
 import { notFound } from "next/navigation";
 import { ChallengeCover, PhaseBadge, phaseTimeline, RankMedal, ScorePill, StageBadge } from "@/components/domain";
 import { Avatar, Badge, Breadcrumbs, ButtonLink, Card, CardHeader, cx, EmptyState, Notice, ProjectLogo, Prose, Tabs } from "@/components/ui";
@@ -67,7 +68,7 @@ export default async function ChallengePage(props: PageProps<"/challenges/[slug]
                   <ul className="grid gap-2 sm:grid-cols-2">
                     {c.objectives.map((o) => (
                       <li key={o} className="flex gap-3 rounded-xl bg-surface p-3.5 text-sm ring-1 ring-line">
-                        <span className="grid size-6 shrink-0 place-items-center rounded-full bg-volt-soft ring-1 ring-volt-strong/50">
+                        <span className="grid size-6 shrink-0 place-items-center rounded-full bg-gold-soft ring-1 ring-gold-strong/50">
                           <Check className="size-3.5" />
                         </span>
                         {o}
@@ -112,18 +113,18 @@ export default async function ChallengePage(props: PageProps<"/challenges/[slug]
             {tab === "prizes" && (
               <div className="space-y-3">
                 {d.prizes.map((p) => (
-                  <Card key={p.id} className="flex items-start gap-4 p-5">
-                    <div className={cx("grid size-11 shrink-0 place-items-center rounded-xl", p.kind === "investment" ? "bg-violet-soft text-violet" : p.kind === "prize" ? "bg-volt-soft ring-1 ring-volt-strong/40" : "bg-sunken")}>
-                      {p.kind === "investment" ? <Gauge className="size-5" /> : p.kind === "prize" ? <Trophy className="size-5" /> : <Award className="size-5" />}
+                  <Card key={p.id} className={cx("flex items-center gap-4 p-4 sm:p-5", p.rank === 1 && "ring-gold-line")}>
+                    <div className={cx("grid size-16 shrink-0 place-items-center rounded-2xl", p.rank === 1 ? "bg-gold-soft" : "bg-mist")}>
+                      <Art name={prizeArt(p.rank, p.kind)} size={48} />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="font-semibold">{p.title}</h3>
-                        <Badge tone={p.kind === "investment" ? "violet" : "neutral"}>{PRIZE_KIND_LABEL[p.kind]}</Badge>
+                        <Badge tone={p.kind === "investment" ? "violet" : p.rank === 1 ? "gold" : "neutral"}>{p.rank ? `${p.rank}.º lugar` : PRIZE_KIND_LABEL[p.kind]}</Badge>
                       </div>
                       {p.description && <p className="mt-1 text-sm text-ink-2">{p.description}</p>}
                     </div>
-                    <div className="text-right font-display text-xl font-semibold whitespace-nowrap">{p.value}</div>
+                    {p.value && <div className="text-right font-display text-xl font-bold whitespace-nowrap">{p.value}</div>}
                   </Card>
                 ))}
                 <p className="text-[13px] text-muted">
@@ -168,8 +169,8 @@ export default async function ChallengePage(props: PageProps<"/challenges/[slug]
               <div className="space-y-3">
                 {!d.resultsPublished && <Notice tone="warn">Pré-visualização: estes resultados ainda não são visíveis para os membros.</Notice>}
                 {d.results.map((r) => (
-                  <Card key={r.projectSlug} className={cx("flex items-center gap-4 p-4", r.rank === 1 && "ring-2 ring-volt-strong")}>
-                    <RankMedal rank={r.rank} />
+                  <Card key={r.projectSlug} className={cx("flex items-center gap-4 p-4", r.rank === 1 && "ring-2 ring-gold")}>
+                    {r.rank <= 3 ? <Art name={prizeArt(r.rank, "prize")} size={44} alt={`${r.rank}.º lugar`} /> : <RankMedal rank={r.rank} />}
                     <ProjectLogo name={r.projectName} hue={r.projectLogoHue} fileId={r.projectLogoFileId} />
                     <Link href={`/projects/${r.projectSlug}`} className="min-w-0 flex-1">
                       <div className="font-semibold hover:underline">{r.projectName}</div>
@@ -321,7 +322,7 @@ function ParticipationPanel({
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold">A sua submissão</h2>
-          {d.resultsPublished ? (myRank ? <Badge tone="volt">{myRank}.º lugar</Badge> : <Badge>Concluído</Badge>) : <Badge tone="ok">Entregue</Badge>}
+          {d.resultsPublished ? (myRank ? <Badge tone="gold">{myRank}.º lugar</Badge> : <Badge>Concluído</Badge>) : <Badge tone="ok">Entregue</Badge>}
         </div>
         <Link href={`/projects/${sub.projectSlug}`} className="flex items-center gap-2 text-sm font-medium hover:underline">
           <FileText className="size-4 text-muted" /> {sub.projectName}

@@ -46,6 +46,30 @@ export async function listCourses(viewer: User) {
   });
 }
 
+/**
+ * The library as anyone may see it on the landing page: what a locked
+ * collection already shows a member without access (title, access level and
+ * size), never videos, links or thumbnails. Empty collections are left out.
+ */
+export async function publicLibrary(limit = 4) {
+  const [all, mods, less] = await Promise.all([
+    db
+      .select({ id: courses.id, slug: courses.slug, title: courses.title, coverHue: courses.coverHue, accessTier: courses.accessTier })
+      .from(courses)
+      .orderBy(asc(courses.position), asc(courses.title)),
+    db.select({ id: modules.id, courseId: modules.courseId }).from(modules),
+    db.select({ moduleId: lessons.moduleId, durationMin: lessons.durationMin, videoUrl: lessons.videoUrl }).from(lessons),
+  ]);
+  return all
+    .map(({ id, ...c }) => {
+      const modIds = new Set(mods.filter((m) => m.courseId === id).map((m) => m.id));
+      const videos = less.filter((l) => modIds.has(l.moduleId) && l.videoUrl);
+      return { ...c, videoCount: videos.length, minutes: videos.reduce((s, l) => s + l.durationMin, 0) };
+    })
+    .filter((c) => c.videoCount > 0)
+    .slice(0, limit);
+}
+
 export async function getCourse(viewer: User, slug: string) {
   const [course] = await db.select().from(courses).where(eq(courses.slug, slug)).limit(1);
   if (!course) throw notFound("Colecção não encontrada.");

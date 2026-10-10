@@ -100,10 +100,14 @@ describe("reactions", () => {
   it("one per member: toggling adds and removes, the count is real, duplicates are impossible", async () => {
     const [a, b, author] = [await mk(), await mk(), await mk()];
     const p = await createPost(author, post());
-    expect(await toggleReaction(a, p.id)).toEqual({ active: true, count: 1 });
-    expect(await toggleReaction(b, p.id)).toEqual({ active: true, count: 2 });
-    expect(await toggleReaction(a, p.id)).toEqual({ active: false, count: 1 });
-    expect(await toggleReaction(a, p.id)).toEqual({ active: true, count: 2 });
+    expect(await toggleReaction(a, p.id)).toMatchObject({ active: true, count: 1 });
+    expect(await toggleReaction(b, p.id)).toMatchObject({ active: true, count: 2 });
+    expect(await toggleReaction(a, p.id)).toMatchObject({ active: false, count: 1 });
+    expect(await toggleReaction(a, p.id)).toMatchObject({ active: true, count: 2 });
+    // Another emoji replaces the member's reaction: still one per member, counted per kind.
+    expect(await toggleReaction(a, p.id, "fire")).toMatchObject({ active: true, kind: "fire", count: 2, counts: [{ kind: "heart", n: 1 }, { kind: "fire", n: 1 }] });
+    expect(await code(toggleReaction(a, p.id, "not-an-emoji"))).toBe("invalid");
+    expect(await toggleReaction(a, p.id, "heart")).toMatchObject({ kind: "heart", count: 2, counts: [{ kind: "heart", n: 2 }] });
     // The database itself refuses a second reaction from the same member.
     await expect(db.insert(reactions).values({ postId: p.id, userId: a.id })).rejects.toThrow();
     const seen = await getPost(a, p.id);

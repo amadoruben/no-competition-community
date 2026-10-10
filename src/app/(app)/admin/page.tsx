@@ -13,7 +13,7 @@ import { requireUser } from "@/server/session";
 
 export const metadata: Metadata = { title: "Administração" };
 
-const toneClass = { volt: "bg-volt text-ink", warn: "bg-warn-soft text-warn", info: "bg-info-soft text-info", neutral: "bg-sunken text-muted" };
+const toneClass = { gold: "bg-gold text-ink", warn: "bg-warn-soft text-warn", info: "bg-info-soft text-info", neutral: "bg-sunken text-muted" };
 
 export default async function AdminPage() {
   const user = await requireUser(["investor"]);
@@ -58,7 +58,7 @@ export default async function AdminPage() {
         {kpis.map(([k, v, h], i) => (
           <div key={k} className={cx("rounded-2xl px-4 py-3 ring-1", i === 2 && v > 0 ? "bg-ink text-white ring-ink" : "bg-surface ring-line")}>
             <dt className={cx("text-[12px]", i === 2 && v > 0 ? "text-white/60" : "text-muted")}>{k}</dt>
-            <dd className={cx("tabular font-display text-3xl font-semibold", i === 2 && v > 0 && "text-volt")}>{v}</dd>
+            <dd className={cx("tabular font-display text-3xl font-semibold", i === 2 && v > 0 && "text-gold")}>{v}</dd>
             <dd className={cx("text-[12px]", i === 2 && v > 0 ? "text-white/60" : "text-muted")}>{h}</dd>
           </div>
         ))}
@@ -89,7 +89,7 @@ export default async function AdminPage() {
                       </div>
                       {r.status === "closed" && r.evaluationsExpected > 0 && (
                         <div className="mt-2 flex max-w-xs items-center gap-2">
-                          <Progress value={(r.evaluationsDone / r.evaluationsExpected) * 100} tone="volt" className="flex-1" />
+                          <Progress value={(r.evaluationsDone / r.evaluationsExpected) * 100} tone="gold" className="flex-1" />
                           <span className="tabular text-[12px] text-muted">{r.evaluationsDone}/{r.evaluationsExpected}</span>
                         </div>
                       )}

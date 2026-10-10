@@ -39,7 +39,7 @@ export default async function ReviewHome() {
                         <span className={cx(r.viewerPending && r.phase !== "results" ? "font-medium text-warn" : "text-muted")}>{r.phase === "results" ? "Concluído" : r.viewerPending ? `${r.viewerPending} por avaliar` : "Tudo avaliado"}</span>
                         <span className="tabular text-muted">{mine}/{r.submissions}</span>
                       </div>
-                      <Progress value={r.submissions ? (mine / r.submissions) * 100 : 0} tone="volt" />
+                      <Progress value={r.submissions ? (mine / r.submissions) * 100 : 0} tone="gold" />
                     </div>
                   </div>
                   <ArrowRight className="m-5 size-4 self-center text-muted" />

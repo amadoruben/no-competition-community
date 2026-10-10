@@ -43,7 +43,7 @@ export function ScoreForm({
                 onClick={() => setScores((s) => ({ ...s, [c.id]: n }))}
                 className={cx(
                   "tabular h-9 rounded-lg font-mono text-[13px] font-medium ring-1 ring-inset transition-colors disabled:opacity-50",
-                  scores[c.id] === n ? "bg-ink text-white ring-ink" : scores[c.id] !== undefined && n < scores[c.id]! ? "bg-volt-soft ring-volt-strong/40" : "bg-surface ring-line hover:ring-ink",
+                  scores[c.id] === n ? "bg-ink text-white ring-ink" : scores[c.id] !== undefined && n < scores[c.id]! ? "bg-gold-soft ring-gold-strong/40" : "bg-surface ring-line hover:ring-ink",
                 )}
               >
                 {n}

@@ -28,17 +28,20 @@ import { DesignInteractive } from "./interactive";
 export const metadata: Metadata = { title: "Design system" };
 
 const colors: [string, string, string][] = [
-  ["paper", "#f6f5f0", "Fundo da aplicação"],
-  ["surface", "#ffffff", "Cartões, painéis"],
-  ["sunken", "#efede6", "Áreas recolhidas, hover"],
-  ["line", "#e3e0d6", "Divisórias"],
-  ["ink", "#101216", "Texto principal, acção primária"],
-  ["ink-2", "#383d45", "Texto secundário"],
-  ["muted", "#62666e", "Metadados (≥4.9:1)"],
-  ["faint", "#868a92", "Só decorativo (ícones)"],
-  ["volt", "#d4f24a", "Acento: acção principal, 'agora'"],
+  ["paper", "#ffffff", "Fundo da aplicação"],
+  ["mist", "#f7f7f5", "Secções alternadas, painéis laterais"],
+  ["sunken", "#f1f1ee", "Campos, chips, hover"],
+  ["line", "#e7e6e1", "Divisórias"],
+  ["line-strong", "#d3d1ca", "Bordas de campos"],
+  ["ink", "#16130e", "Texto principal, acção primária (18,5:1)"],
+  ["ink-2", "#3d3a34", "Texto secundário"],
+  ["muted", "#6b6862", "Metadados (5,3:1)"],
+  ["faint", "#9c9992", "Só decorativo (ícones)"],
+  ["gold", "#c39b4a", "Acento: botão principal, estados activos (texto escuro por cima, 7,2:1)"],
+  ["gold-strong", "#80611f", "Texto e ícones dourados sobre branco (5,8:1)"],
+  ["gold-soft", "#faf5ea", "Fundos seleccionados e destaques"],
   ["ok", "#17704d", "Sucesso"],
-  ["warn", "#a2500a", "Aviso, prazos"],
+  ["warn", "#9a4d0b", "Aviso, prazos"],
   ["bad", "#b42339", "Erro, destrutivo"],
   ["info", "#2846c2", "Informação"],
   ["violet", "#6d3fc0", "Em avaliação, investimento"],
@@ -83,7 +86,7 @@ export default async function DesignPage() {
           ))}
         </div>
         <Notice className="mt-4">
-          Contraste verificado (WCAG AA): ink 17:1, ink-2 10:1, muted ≥4.9:1 em paper/surface/sunken; texto sobre fundos de estado ≥5:1. O volt é usado como fundo, nunca como cor de texto sobre claro.
+          Contraste verificado (WCAG AA): ink 17:1, ink-2 10:1, muted ≥4.9:1 em paper/surface/sunken; texto sobre fundos de estado ≥5:1. O gold é usado como fundo, nunca como cor de texto sobre claro.
         </Notice>
       </Section>
 
@@ -145,7 +148,7 @@ export default async function DesignPage() {
           <Card className="space-y-5 p-5">
             <Breadcrumbs items={[{ label: "Desafios", href: "/challenges" }, { label: "Energia acessível para PME" }]} />
             <Tabs active="a" items={[{ key: "a", label: "Visão geral", href: "#dados" }, { key: "b", label: "Regras", href: "#dados" }, { key: "c", label: "Participantes", href: "#dados", count: 5 }]} />
-            <Progress value={64} tone="volt" />
+            <Progress value={64} tone="gold" />
             <Pagination page={2} pages={5} total={48} label="resultados" href={() => "#dados"} />
           </Card>
         </div>
@@ -161,7 +164,7 @@ export default async function DesignPage() {
               {(["idea", "prototype", "mvp", "traction", "scaling"] as const).map((s) => <StageBadge key={s} stage={s} />)}
             </div>
             <div className="flex flex-wrap gap-2">
-              {(["neutral", "volt", "ok", "warn", "bad", "info", "violet", "dark"] as Tone[]).map((t) => <Badge key={t} tone={t}>{t}</Badge>)}
+              {(["neutral", "gold", "ok", "warn", "bad", "info", "violet", "dark"] as Tone[]).map((t) => <Badge key={t} tone={t}>{t}</Badge>)}
             </div>
             <div className="flex items-center gap-3">
               <RankMedal rank={1} /><RankMedal rank={2} /><RankMedal rank={3} /><RankMedal rank={4} />

@@ -8,20 +8,23 @@ import type { ActionState } from "@/lib/action-state";
 import { deleteAccount, emailSchema, passwordSchema, resolveUser, validateRegistration } from "@/server/accounts";
 import { auth, AuthError } from "@/server/auth";
 import { createChallenge, setChallengeStatus, setEvaluator, updateChallenge } from "@/server/challenges";
-import { addComment, createPost, deleteComment, deletePost, setPinned, toggleReaction, toggleSaved, updatePost } from "@/server/community";
+import { addComment, createPost, deleteComment, deletePost, setPinned, toggleReaction, toggleSaved, updatePost, type ReactionCount } from "@/server/community";
 import { DomainError, invalid } from "@/server/errors";
 import { UNAVAILABLE_MESSAGE, isInfraUnavailable } from "@/server/infra-errors";
 import { addVideo, createCollection, deleteCollection, deleteVideo, setCollectionAccess, setLessonComplete } from "@/server/learning";
+import { setFollowing } from "@/server/follows";
 import { logger } from "@/server/logger";
 import { updateProfile } from "@/server/members";
 import { enroll, submitProject } from "@/server/participation";
+import { createSocialPost, updateSocialPost } from "@/server/social";
+import { createStory, deleteStory } from "@/server/stories";
 import { changeRole, setAccessTier } from "@/server/people";
 import { addProjectMember, addProjectUpdate, createProject, removeProjectMember, updateProject } from "@/server/projects";
 import { confirmResults, publishResults, saveEvaluation, setSubmissionStatus, upsertOpportunity } from "@/server/review";
 import { currentUser, homeFor } from "@/server/session";
 import { parse } from "@/server/validation";
 import { db } from "@/db";
-import { users } from "@/db/schema";
+import { users, type ReactionKind } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { DEMO_PASSWORD } from "@/db/seed-data";
 import { demoMode } from "@/server/config";
@@ -362,6 +365,10 @@ export async function updateProfileAction(_: ActionState, fd: FormData): Promise
         websiteUrl: str(fd, "websiteUrl"),
         linkedinUrl: str(fd, "linkedinUrl"),
         githubUrl: str(fd, "githubUrl"),
+        instagram: str(fd, "instagram"),
+        tiktok: str(fd, "tiktok"),
+        youtube: str(fd, "youtube"),
+        x: str(fd, "x"),
       }),
     "Perfil actualizado.",
   );
@@ -399,11 +406,14 @@ export async function deleteCommentAction(commentId: string) {
 }
 
 /** Returns the persisted state and the real count so optimistic UI can reconcile (or roll back on failure). */
-export async function reactAction(postId: string): Promise<{ ok: boolean; active?: boolean; count?: number; error?: string }> {
+export async function reactAction(
+  postId: string,
+  kind: string = "heart",
+): Promise<{ ok: boolean; active?: boolean; kind?: ReactionKind | null; count?: number; counts?: ReactionCount[]; error?: string }> {
   const u = await actor();
-  let state: { active: boolean; count: number } | undefined;
+  let state: Awaited<ReturnType<typeof toggleReaction>> | undefined;
   const r = await attempt(async () => {
-    state = await toggleReaction(u, postId);
+    state = await toggleReaction(u, postId, kind);
   });
   return r.ok && state ? { ok: true, ...state } : { ok: false, error: r.error };
 }
@@ -415,6 +425,27 @@ export async function saveAction(postId: string): Promise<{ ok: boolean; active?
     active = await toggleSaved(u, postId);
   });
   return r.ok ? { ok: true, active } : { ok: false, error: r.error };
+}
+
+/** Follow or stop following; returns the real follower count afterwards. */
+export async function followAction(userId: string, follow: boolean): Promise<{ ok: boolean; following?: boolean; followers?: number; error?: string }> {
+  const u = await actor();
+  let state: { following: boolean; followers: number } | undefined;
+  const r = await attempt(async () => {
+    state = await setFollowing(u, userId, follow);
+  });
+  return r.ok && state ? { ok: true, ...state } : { ok: false, error: r.error };
+}
+
+export async function createStoryAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  const u = await actor();
+  const image = fd.get("image");
+  return attempt(() => createStory(u, { caption: str(fd, "caption") }, image instanceof Blob && image.size > 0 ? image : undefined), "Story publicado.");
+}
+
+export async function deleteStoryAction(storyId: string) {
+  const u = await actor();
+  return attempt(() => deleteStory(u, storyId), "Story eliminado.");
 }
 
 export async function pinAction(postId: string, pinned: boolean) {
@@ -430,6 +461,26 @@ export async function lessonAction(lessonId: string, complete: boolean) {
 export async function deletePostAction(postId: string) {
   const u = await actor();
   return attempt(() => deletePost(u, postId), "Publicação removida.");
+}
+
+// Social publications (admin) ----------------------------------------------------------
+
+const coverOf = (fd: FormData) => {
+  const f = fd.get("cover");
+  return f instanceof Blob && f.size > 0 ? f : undefined;
+};
+
+export async function createSocialAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  const u = await actor();
+  return attempt(() => createSocialPost(u, { url: str(fd, "url"), title: str(fd, "title"), caption: str(fd, "caption") }, coverOf(fd)), "Publicação partilhada na comunidade.");
+}
+
+export async function updateSocialAction(postId: string, _: ActionState, fd: FormData): Promise<ActionState> {
+  const u = await actor();
+  return attempt(
+    () => updateSocialPost(u, postId, { url: str(fd, "url"), title: str(fd, "title"), caption: str(fd, "caption") }, coverOf(fd), str(fd, "removeCover") === "1"),
+    "Publicação actualizada.",
+  );
 }
 
 // Videos (admin) ------------------------------------------------------------------

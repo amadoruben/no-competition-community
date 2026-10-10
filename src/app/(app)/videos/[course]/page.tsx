@@ -39,7 +39,7 @@ export default async function CollectionPage(props: PageProps<"/videos/[course]"
         <div className="flex flex-col p-5 sm:p-7">
           <div className="flex flex-wrap items-center gap-2 text-[12px] text-muted">
             {c.accessTier === "full" ? (
-              <Badge tone={d.locked ? "dark" : "volt"} className="h-5 px-2 text-[11px]">
+              <Badge tone={d.locked ? "dark" : "gold"} className="h-5 px-2 text-[11px]">
                 <Lock className="size-3" /> Exclusivo
               </Badge>
             ) : (

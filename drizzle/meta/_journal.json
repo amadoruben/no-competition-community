@@ -36,6 +36,13 @@
       "when": 1791624941576,
       "tag": "0004_feed_media_replies_saved",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791639000063,
+      "tag": "0005_follows_stories_social",
+      "breakpoints": true
     }
   ]
 }

@@ -145,7 +145,7 @@ export default async function ProjectPage(props: PageProps<"/projects/[slug]">) 
                     <Link href={`/challenges/${s.challengeSlug}`} className="text-sm font-medium hover:underline">{s.challengeTitle}</Link>
                     <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px] text-muted">
                       {s.rank ? (
-                        <Badge tone={s.rank === 1 ? "volt" : "neutral"}><Trophy className="size-3" /> {s.rank}.º lugar</Badge>
+                        <Badge tone={s.rank === 1 ? "gold" : "neutral"}><Trophy className="size-3" /> {s.rank}.º lugar</Badge>
                       ) : s.challengeStatus === "results_published" ? (
                         <Badge>Participou</Badge>
                       ) : (

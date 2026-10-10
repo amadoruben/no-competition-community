@@ -16,9 +16,9 @@ export function buttonClass(variant: ButtonVariant = "primary", size: ButtonSize
     size === "sm" && "h-8 px-3 text-[13px]",
     size === "md" && "h-10 px-4 text-sm",
     size === "lg" && "h-12 px-6 text-[15px]",
-    variant === "primary" && "bg-ink text-white hover:bg-ink-2",
-    variant === "accent" && "bg-volt text-ink hover:bg-volt-strong",
-    variant === "secondary" && "bg-surface text-ink ring-1 ring-line-strong ring-inset hover:bg-sunken",
+    variant === "primary" && "bg-ink text-white hover:bg-graphite",
+    variant === "accent" && "bg-gold text-ink shadow-[inset_0_1px_0_rgb(255_255_255/0.25)] hover:bg-gold-hover",
+    variant === "secondary" && "bg-surface text-ink ring-1 ring-line-strong ring-inset hover:bg-mist hover:ring-ink/25",
     variant === "ghost" && "text-ink-2 hover:bg-sunken hover:text-ink",
     variant === "danger" && "bg-surface text-bad ring-1 ring-bad/30 ring-inset hover:bg-bad-soft",
     extra,
@@ -48,7 +48,7 @@ export function ButtonLink({
 export function Card({ className, ...props }: ComponentProps<"div">) {
   return (
     <div
-      className={clsx("rounded-[var(--radius-card)] bg-surface shadow-[var(--shadow-card)] ring-1 ring-line/70", className)}
+      className={clsx("rounded-[var(--radius-card)] bg-surface shadow-[var(--shadow-card)] ring-1 ring-line", className)}
       {...props}
     />
   );
@@ -56,7 +56,7 @@ export function Card({ className, ...props }: ComponentProps<"div">) {
 
 export function CardHeader({ title, action, subtitle }: { title: ReactNode; action?: ReactNode; subtitle?: ReactNode }) {
   return (
-    <div className="flex items-start justify-between gap-4 border-b border-line/70 px-5 py-4">
+    <div className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
       <div className="min-w-0">
         <h2 className="font-display text-[16px] font-semibold text-ink">{title}</h2>
         {subtitle && <p className="mt-0.5 text-[13px] text-muted">{subtitle}</p>}
@@ -68,11 +68,11 @@ export function CardHeader({ title, action, subtitle }: { title: ReactNode; acti
 
 // Badges -----------------------------------------------------------------------
 
-export type Tone = "neutral" | "volt" | "ok" | "warn" | "bad" | "info" | "violet" | "dark";
+export type Tone = "neutral" | "gold" | "ok" | "warn" | "bad" | "info" | "violet" | "dark";
 
 const toneClass: Record<Tone, string> = {
   neutral: "bg-sunken text-ink-2",
-  volt: "bg-volt-soft text-ink ring-1 ring-inset ring-volt-strong/50",
+  gold: "bg-gold-soft text-gold-strong ring-1 ring-inset ring-gold-line",
   ok: "bg-ok-soft text-ok",
   warn: "bg-warn-soft text-warn",
   bad: "bg-bad-soft text-bad",
@@ -118,7 +118,7 @@ export function Avatar({ name, hue, size = 36, fileId, className }: { name: stri
     <span
       aria-hidden
       className={clsx("inline-grid shrink-0 place-items-center rounded-full font-semibold select-none", className)}
-      style={{ ...box, fontSize: Math.round(size * 0.38), background: `hsl(${hue} 70% 88%)`, color: `hsl(${hue} 55% 25%)` }}
+      style={{ ...box, fontSize: Math.round(size * 0.38), background: `hsl(${hue} 32% 91%)`, color: `hsl(${hue} 38% 26%)` }}
     >
       {initials(name)}
     </span>
@@ -134,7 +134,7 @@ export function ProjectLogo({ name, hue, size = 44, fileId, className }: { name:
     <span
       aria-hidden
       className={clsx("inline-grid shrink-0 place-items-center font-display font-bold text-white select-none", className)}
-      style={{ ...box, fontSize: Math.round(size * 0.42), background: `linear-gradient(140deg, hsl(${hue} 70% 45%), hsl(${hue + 30} 65% 28%))` }}
+      style={{ ...box, fontSize: Math.round(size * 0.42), background: `linear-gradient(140deg, hsl(${hue} 42% 34%), hsl(${hue + 24} 46% 20%))` }}
     >
       {name.trim()[0]?.toUpperCase()}
     </span>
@@ -157,8 +157,8 @@ export function PageHeader({
   return (
     <div className="flex flex-col gap-4 pb-6 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0">
-        {eyebrow && <div className="mb-1.5 text-[12px] font-semibold tracking-[0.08em] text-muted uppercase">{eyebrow}</div>}
-        <h1 className="font-display text-[28px] leading-[1.1] font-semibold sm:text-[34px]">{title}</h1>
+        {eyebrow && <div className="eyebrow mb-2">{eyebrow}</div>}
+        <h1 className="font-display text-[28px] leading-[1.1] font-bold sm:text-[34px]">{title}</h1>
         {description && <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-ink-2">{description}</p>}
       </div>
       {actions && <div className="flex shrink-0 flex-wrap gap-2">{actions}</div>}
@@ -171,7 +171,7 @@ export function SectionTitle({ title, action, subtitle, id }: { title: ReactNode
   return (
     <div className="mb-3 flex items-end justify-between gap-4">
       <div className="min-w-0">
-        <h2 id={id} className="font-display text-[20px] leading-tight font-semibold">{title}</h2>
+        <h2 id={id} className="font-display text-[20px] leading-tight font-bold">{title}</h2>
         {subtitle && <p className="mt-0.5 text-[13px] text-muted">{subtitle}</p>}
       </div>
       {action}
@@ -184,12 +184,12 @@ export function EmptyState({ icon, title, children, action, compact }: { icon?: 
     <div className={clsx("flex flex-col items-center px-6 text-center", compact ? "py-8" : "py-14")}>
       {icon && (
         <div aria-hidden className="relative mb-4 grid size-14 place-items-center">
-          <span className="absolute inset-0 rounded-full ring-[3px] ring-volt-strong/60" />
-          <span className="absolute inset-[7px] rounded-full bg-volt-soft" />
-          <span className="relative text-ink [&_svg]:size-5">{icon}</span>
+          <span className="absolute inset-0 rounded-full ring-1 ring-gold-line" />
+          <span className="absolute inset-[6px] rounded-full bg-gold-soft" />
+          <span className="relative text-gold-strong [&_svg]:size-5">{icon}</span>
         </div>
       )}
-      <p className="font-display text-[17px] font-semibold text-ink">{title}</p>
+      <p className="font-display text-[17px] font-bold text-ink">{title}</p>
       {children && <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted">{children}</p>}
       {action && <div className="mt-5">{action}</div>}
     </div>
@@ -206,12 +206,12 @@ export function Stat({ label, value, hint }: { label: string; value: ReactNode; 
   );
 }
 
-export function Progress({ value, className, tone = "ink" }: { value: number; className?: string; tone?: "ink" | "volt" | "ok" }) {
+export function Progress({ value, className, tone = "ink" }: { value: number; className?: string; tone?: "ink" | "gold" | "ok" }) {
   const pct = Math.max(0, Math.min(100, value));
   return (
     <div className={clsx("h-1.5 overflow-hidden rounded-full bg-sunken", className)} role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>
       <div
-        className={clsx("h-full rounded-full", tone === "ink" && "bg-ink", tone === "volt" && "bg-volt-strong", tone === "ok" && "bg-ok")}
+        className={clsx("h-full rounded-full", tone === "ink" && "bg-ink", tone === "gold" && "bg-gold", tone === "ok" && "bg-ok")}
         style={{ width: `${pct}%` }}
       />
     </div>
@@ -245,7 +245,7 @@ export function Tabs({ items, active }: { items: { key: string; label: ReactNode
           aria-current={t.key === active ? "page" : undefined}
           className={clsx(
             "relative -mb-px flex h-11 items-center gap-1.5 border-b-2 px-3 text-sm font-medium whitespace-nowrap transition-colors",
-            t.key === active ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink",
+            t.key === active ? "border-gold text-ink" : "border-transparent text-muted hover:text-ink",
           )}
         >
           {t.label}
@@ -322,7 +322,7 @@ export function Pagination({ page, pages, href, total, label = "resultados" }: {
         {nums.map((n, i) => (
           <li key={n} className="flex items-center gap-1">
             {i > 0 && n - nums[i - 1] > 1 && <span className="px-1 text-muted">…</span>}
-            <Link href={href(n)} aria-current={n === page ? "page" : undefined} className={clsx(cell, "tabular", n === page ? "bg-ink text-white" : "hover:bg-sunken")}>
+            <Link href={href(n)} aria-current={n === page ? "page" : undefined} className={clsx(cell, "tabular", n === page ? "bg-gold-soft text-ink ring-1 ring-gold ring-inset" : "hover:bg-sunken")}>
               {n}
             </Link>
           </li>
@@ -339,7 +339,7 @@ export function Pagination({ page, pages, href, total, label = "resultados" }: {
 /** Pill-style filter links (single choice). */
 export function FilterChips({ items, active, label }: { items: { key: string; label: string; href: string }[]; active: string; label: string }) {
   return (
-    <nav aria-label={label} className="scrollbar-none -mx-4 flex gap-1.5 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+    <nav aria-label={label} className="scrollbar-none -mx-4 flex gap-1.5 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
       {items.map((it) => (
         <Link
           key={it.key}
@@ -347,8 +347,8 @@ export function FilterChips({ items, active, label }: { items: { key: string; la
           scroll={false}
           aria-current={it.key === active ? "true" : undefined}
           className={clsx(
-            "h-8 rounded-full px-3 text-[13px] leading-8 font-medium whitespace-nowrap ring-1 ring-inset transition-colors",
-            it.key === active ? "bg-ink text-white ring-ink" : "bg-surface text-ink-2 ring-line hover:ring-line-strong",
+            "h-8 rounded-full px-3.5 text-[13px] leading-8 font-medium whitespace-nowrap ring-1 ring-inset transition-colors",
+            it.key === active ? "bg-gold-soft text-ink ring-gold" : "bg-surface text-ink-2 ring-line hover:text-ink hover:ring-line-strong",
           )}
         >
           {it.label}
@@ -373,7 +373,7 @@ export function SearchBox({ name = "q", defaultValue, placeholder, label, hidden
         defaultValue={defaultValue}
         placeholder={placeholder}
         aria-label={label}
-        className="h-10 w-full rounded-full bg-surface pr-3 pl-9 text-sm ring-1 ring-line-strong ring-inset placeholder:text-muted focus:ring-2 focus:ring-ink focus:outline-none"
+        className="h-10 w-full rounded-full bg-surface pr-3 pl-9 text-sm ring-1 ring-line-strong ring-inset placeholder:text-muted focus:ring-2 focus:ring-gold-strong focus:outline-none"
       />
     </form>
   );
@@ -393,7 +393,7 @@ export function StatePanel({ icon, title, children, action, tone = "neutral" }: 
           {icon}
         </div>
       )}
-      <h1 className="font-display text-2xl font-semibold">{title}</h1>
+      <h1 className="font-display text-2xl font-bold">{title}</h1>
       {children && <div className="mt-2 text-[15px] text-ink-2">{children}</div>}
       {action && <div className="mt-6 flex flex-wrap justify-center gap-2">{action}</div>}
     </div>

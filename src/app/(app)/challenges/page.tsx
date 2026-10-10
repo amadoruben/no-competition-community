@@ -120,7 +120,7 @@ export default async function ChallengesPage(props: PageProps<"/challenges">) {
             <ul className="divide-y divide-line/70">
               {winners.map((w) => (
                 <li key={`${w.challengeSlug}-${w.rank}`} className="flex items-center gap-4 px-5 py-3.5">
-                  <span className={cx("grid size-9 shrink-0 place-items-center rounded-full text-[13px] font-semibold", w.rank === 1 ? "bg-volt text-ink" : "bg-sunken text-ink-2")}>
+                  <span className={cx("grid size-9 shrink-0 place-items-center rounded-full text-[13px] font-semibold", w.rank === 1 ? "bg-gold text-ink" : "bg-sunken text-ink-2")}>
                     {w.rank === 1 ? <Trophy className="size-4" /> : `${w.rank}.º`}
                   </span>
                   <ProjectLogo name={w.projectName} hue={w.logoHue} fileId={w.logoFileId} size={36} />
@@ -130,7 +130,7 @@ export default async function ChallengesPage(props: PageProps<"/challenges">) {
                       {w.challengeTitle}
                     </Link>
                   </div>
-                  {w.prize && <Badge tone={w.rank === 1 ? "volt" : "neutral"} className="hidden sm:inline-flex">{w.prize}</Badge>}
+                  {w.prize && <Badge tone={w.rank === 1 ? "gold" : "neutral"} className="hidden sm:inline-flex">{w.prize}</Badge>}
                 </li>
               ))}
             </ul>

@@ -1,6 +1,9 @@
+import { sql } from "drizzle-orm";
+import { REACTION_KINDS, type ReactionKind } from "../lib/reactions";
 import {
   type AnyPgColumn,
   boolean,
+  check,
   doublePrecision,
   index,
   integer,
@@ -57,6 +60,8 @@ export const users = pgTable("users", {
   websiteUrl: text("website_url"),
   linkedinUrl: text("linkedin_url"),
   githubUrl: text("github_url"),
+  /** Profiles on social networks, by platform (see lib/social): canonical https links, set by the member. */
+  socialLinks: jsonb("social_links").$type<Partial<Record<"instagram" | "tiktok" | "youtube" | "x", string>>>().notNull().default({}),
   avatarHue: integer("avatar_hue").notNull().default(210),
   avatarFileId: uuid("avatar_file_id").references((): AnyPgColumn => files.id, { onDelete: "set null" }),
   isDemo: boolean("is_demo").notNull().default(false),
@@ -386,8 +391,16 @@ export const decisionLog = pgTable(
   (t) => [index("decision_log_challenge").on(t.challengeId, t.createdAt)],
 );
 
+/** What members choose when publishing in the feed. */
 export const POST_KINDS = ["discussion", "announcement", "progress", "question"] as const;
 export type PostKind = (typeof POST_KINDS)[number];
+/**
+ * Everything a `posts` row can be: feed posts, stories (shown for a few days
+ * in the stories bar, never in the feed) and social publications curated by
+ * the team. Plain text in the database: adding a kind needs no migration.
+ */
+export const ALL_POST_KINDS = [...POST_KINDS, "story", "social"] as const;
+export type AnyPostKind = (typeof ALL_POST_KINDS)[number];
 
 export const posts = pgTable(
   "posts",
@@ -396,13 +409,16 @@ export const posts = pgTable(
     authorId: uuid("author_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    kind: text("kind", { enum: POST_KINDS }).notNull().default("discussion"),
+    kind: text("kind", { enum: ALL_POST_KINDS }).notNull().default("discussion"),
     title: text("title").notNull(),
     body: text("body").notNull(),
     challengeId: uuid("challenge_id").references(() => challenges.id, { onDelete: "set null" }),
     projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
     pinned: boolean("pinned").notNull().default(false),
-    /** A YouTube, Vimeo or https video file link (see lib/video): embedded, never uploaded. */
+    /**
+     * A YouTube, Vimeo or https video file link (see lib/video): embedded, never
+     * uploaded. For kind "social", the link to the original publication (lib/social).
+     */
     videoUrl: text("video_url"),
     /** Set when the author edits the text; shown as "editado". */
     editedAt: ts("edited_at"),
@@ -462,6 +478,30 @@ export const comments = pgTable(
   (t) => [index("comments_post").on(t.postId, t.createdAt)],
 );
 
+/**
+ * Who follows whom. Following only shapes what a member sees first (the
+ * "A seguir" feed, suggestions, stories order); it grants no access.
+ */
+export const follows = pgTable(
+  "follows",
+  {
+    followerId: uuid("follower_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    followeeId: uuid("followee_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.followerId, t.followeeId] }),
+    index("follows_followee").on(t.followeeId),
+    check("follows_not_self", sql`${t.followerId} <> ${t.followeeId}`),
+  ],
+);
+
+export { REACTION_KINDS, type ReactionKind };
+
 export const reactions = pgTable(
   "reactions",
   {
@@ -471,6 +511,7 @@ export const reactions = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: REACTION_KINDS }).notNull().default("heart"),
     createdAt: createdAt(),
   },
   (t) => [primaryKey({ columns: [t.postId, t.userId] })],
@@ -509,6 +550,8 @@ export const lessons = pgTable("lessons", {
   videoUrl: text("video_url"),
   durationMin: integer("duration_min").notNull().default(5),
   position: integer("position").notNull().default(0),
+  /** When the video was added. Null for videos added before this was recorded (never shown as new). */
+  createdAt: ts("created_at").defaultNow(),
 });
 
 export const lessonProgress = pgTable(

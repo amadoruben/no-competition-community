@@ -32,7 +32,7 @@ export function Toaster() {
           {t.tone === "bad" ? (
             <TriangleAlert className="size-4 shrink-0" />
           ) : (
-            <span className="grid size-5 shrink-0 place-items-center rounded-full bg-volt text-ink"><Check className="size-3.5" /></span>
+            <span className="grid size-5 shrink-0 place-items-center rounded-full bg-gold text-ink"><Check className="size-3.5" /></span>
           )}
           {t.message}
         </div>

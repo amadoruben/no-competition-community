@@ -1,6 +1,6 @@
 import { and, count, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { lessonProgress, posts, projectUpdates, users, type User } from "@/db/schema";
+import { lessonProgress, posts, POST_KINDS, projectUpdates, users, type User } from "@/db/schema";
 import { challengePhase } from "@/lib/challenge-state";
 import { daysUntil } from "@/lib/format";
 import { listChallenges } from "./challenges";
@@ -22,7 +22,7 @@ export async function memberDashboard(user: User) {
     projectsForUser(user.id),
     memberPoints(user.id),
     listFeed(user, { limit: 4 }),
-    db.select({ id: posts.id }).from(posts).where(eq(posts.authorId, user.id)).limit(1),
+    db.select({ id: posts.id }).from(posts).where(and(eq(posts.authorId, user.id), inArray(posts.kind, [...POST_KINDS]))).limit(1),
     db.select({ id: lessonProgress.lessonId }).from(lessonProgress).where(eq(lessonProgress.userId, user.id)).limit(1),
   ]);
   const challenges = challengeList.map((c) => ({ ...c, phase: challengePhase(c) }));

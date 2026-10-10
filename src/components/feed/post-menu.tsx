@@ -5,14 +5,14 @@ import { ExternalLink, Link2, MoreHorizontal, Pencil, Pin, PinOff, Trash2 } from
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState, useTransition, type KeyboardEvent } from "react";
 import { deletePostAction, pinAction, updatePostAction } from "@/app/actions";
-import type { PostKind } from "@/db/schema";
+import type { AnyPostKind, PostKind } from "@/db/schema";
 import { POST_KIND_LABEL } from "@/lib/labels";
 import { ActionForm, Field, Input, SubmitButton, Textarea } from "../form";
 import { Dialog } from "../overlay";
 import { toast } from "../toaster";
 import { buttonClass } from "../ui";
 
-type Post = { id: string; kind: PostKind; title: string; body: string; pinned: boolean };
+type Post = { id: string; kind: AnyPostKind; title: string; body: string; pinned: boolean };
 
 /**
  * "⋯" menu with only the actions this viewer may take. Arrow keys move
@@ -125,9 +125,14 @@ export function PostMenu({
               <ExternalLink className="size-4 text-muted" /> Abrir publicação
             </button>
           )}
-          {isAuthor && (
+          {isAuthor && post.kind !== "social" && (
             <button role="menuitem" type="button" className={item} onClick={() => (close(false), setDialog("edit"))}>
               <Pencil className="size-4 text-muted" /> Editar
+            </button>
+          )}
+          {isAdmin && post.kind === "social" && (
+            <button role="menuitem" type="button" className={item} onClick={() => router.push(`/admin/social?edit=${post.id}`)}>
+              <Pencil className="size-4 text-muted" /> Editar em Conteúdos sociais
             </button>
           )}
           {isAdmin && (
@@ -170,9 +175,10 @@ export function PostMenu({
 
 function EditForm({ post, canAnnounce, onDone }: { post: Post; canAnnounce: boolean; onDone: () => void }) {
   const kinds: PostKind[] = ["discussion", "question", "progress", ...(canAnnounce || post.kind === "announcement" ? (["announcement"] as const) : [])];
+  const current = kinds.find((k) => k === post.kind) ?? "discussion";
   return (
     <ActionForm action={updatePostAction.bind(null, post.id)} onSuccess={onDone} className="space-y-4">
-      <KindPicker kinds={kinds} defaultValue={post.kind} />
+      <KindPicker kinds={kinds} defaultValue={current} />
       <Field name="title" label="Título (opcional)">
         <Input name="title" defaultValue={post.title} maxLength={140} />
       </Field>

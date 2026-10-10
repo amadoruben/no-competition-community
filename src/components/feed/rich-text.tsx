@@ -25,9 +25,16 @@ function Linked({ text }: { text: string }) {
 /**
  * Plain text with line breaks kept and web links made clickable. Nothing else
  * is interpreted: no HTML, no markdown, only http(s) links (never javascript:).
- * `flow` keeps everything in one block, which is what line clamping needs.
+ * `flow` keeps everything in one block, which is what line clamping needs;
+ * `inline` continues a sentence (a caption after the author's name).
  */
-export function RichText({ text, className, flow }: { text: string; className?: string; flow?: boolean }) {
+export function RichText({ text, className, flow, inline }: { text: string; className?: string; flow?: boolean; inline?: boolean }) {
+  if (inline)
+    return (
+      <span className={className} style={{ whiteSpace: "pre-line" }}>
+        <Linked text={text} />
+      </span>
+    );
   if (flow)
     return (
       <p className={className} style={{ whiteSpace: "pre-line" }}>

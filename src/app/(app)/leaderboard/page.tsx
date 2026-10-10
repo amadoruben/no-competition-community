@@ -1,6 +1,7 @@
 import { Info, Trophy } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Art } from "@/components/art";
 import { RankMedal, ScorePill } from "@/components/domain";
 import { MembersSwitch } from "@/components/members-switch";
 import { Avatar, Card, CardHeader, cx, EmptyState, PageHeader, ProjectLogo, Tabs } from "@/components/ui";
@@ -91,17 +92,17 @@ async function Standings({ view, hint, me }: { view: LeaderboardView; hint: stri
               key={r.userId}
               href={`/members/${r.handle}`}
               className={cx(
-                "flex min-w-0 flex-col items-center rounded-[var(--radius-card)] px-2 pt-4 pb-3 text-center ring-1 transition-shadow hover:shadow-[var(--shadow-pop)] sm:px-4 sm:pt-6 sm:pb-5",
-                i === 1 ? "bg-ink text-white ring-ink sm:pt-8" : "bg-surface ring-line/80",
+                "flex min-w-0 flex-col items-center rounded-[var(--radius-card)] px-2 pt-3 pb-3 text-center ring-1 transition-shadow hover:shadow-[var(--shadow-pop)] sm:px-4 sm:pt-5 sm:pb-5",
+                i === 1 ? "bg-gold-soft ring-gold-line sm:pt-6" : "bg-surface ring-line/80",
               )}
             >
-              <span className="relative inline-flex">
-                <Avatar name={r.name} hue={r.avatarHue} fileId={r.avatarFileId} size={i === 1 ? 64 : 48} className={i === 1 ? "ring-4 ring-volt" : "ring-4 ring-sunken"} />
-                <span className={cx("tabular absolute -right-2 -bottom-1 grid size-6 place-items-center rounded-full text-[12px] font-bold ring-2", i === 1 ? "bg-volt text-ink ring-ink" : "bg-surface text-ink ring-line-strong")}>{r.rank}</span>
+              <Art name={r.rank === 1 ? "medal-1" : r.rank === 2 ? "medal-2" : "medal-3"} size={i === 1 ? 44 : 34} alt={`${r.rank}.º lugar`} />
+              <span className="mt-2 inline-flex">
+                <Avatar name={r.name} hue={r.avatarHue} fileId={r.avatarFileId} size={i === 1 ? 64 : 48} className={i === 1 ? "ring-4 ring-gold" : "ring-4 ring-sunken"} />
               </span>
               <div className="mt-3 w-full truncate text-[13px] font-semibold sm:text-sm">{r.name}</div>
-              <div className={cx("tabular font-display text-[22px] leading-tight font-semibold sm:text-[26px]", i === 1 && "text-volt")}>{value(r)}</div>
-              <div className={cx("text-[12px]", i === 1 ? "text-white/60" : "text-muted")}>pontos</div>
+              <div className={cx("tabular font-display text-[22px] leading-tight font-bold sm:text-[26px]", i === 1 && "text-gold-strong")}>{value(r)}</div>
+              <div className="text-[12px] text-muted">pontos</div>
             </Link>
           ) : (
             <div key={i} />
@@ -118,7 +119,7 @@ async function Standings({ view, hint, me }: { view: LeaderboardView; hint: stri
         </div>
         <ol>
           {rows.map((r) => (
-            <li key={r.userId} className={cx("grid grid-cols-[40px_1fr_auto] items-center gap-3 border-b border-line/50 px-4 py-2.5 last:border-0 sm:grid-cols-[40px_1fr_90px_90px_80px]", r.userId === me && "bg-volt-soft")}>
+            <li key={r.userId} className={cx("grid grid-cols-[40px_1fr_auto] items-center gap-3 border-b border-line/50 px-4 py-2.5 last:border-0 sm:grid-cols-[40px_1fr_90px_90px_80px]", r.userId === me && "bg-gold-soft")}>
               <RankMedal rank={r.rank} />
               <Link href={`/members/${r.handle}`} className="flex min-w-0 items-center gap-3">
                 <Avatar name={r.name} hue={r.avatarHue} fileId={r.avatarFileId} size={32} />

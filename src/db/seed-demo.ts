@@ -13,7 +13,7 @@ import { challengeSeeds, courseSeeds, DEMO_PASSWORD, evaluationSeeds, people, pr
 
 /** Application tables (auth provider tables are left to the provider). */
 export const APP_TABLES = [
-  "lesson_progress", "lessons", "modules", "courses", "reactions", "comments", "posts", "decision_log",
+  "follows", "saved_posts", "post_media", "lesson_progress", "lessons", "modules", "courses", "reactions", "comments", "posts", "decision_log",
   "opportunities", "results", "evaluations", "evaluator_assignments", "submissions", "participations",
   "project_updates", "project_members", "projects", "prizes", "criteria", "challenges", "files", "users",
 ] as const;
@@ -213,6 +213,21 @@ export async function seedDemo(db: DB) {
   ];
   for (const [p, ks] of reactors) for (const k of ks) await tx.insert(s.reactions).values({ postId: p, userId: U[k] });
 
+  // Members who confirmed following the host on the networks, and the team's stories (demonstration only: text, no photos).
+  const follow: [PersonKey, PersonKey[]][] = [
+    ["ana", ["helena", "leonor", "rita"]],
+    ["bruno", ["helena", "ana"]],
+    ["carolina", ["helena", "diogo"]],
+    ["leonor", ["helena", "ana", "goncalo"]],
+    ["rita", ["helena"]],
+    ["goncalo", ["leonor"]],
+  ];
+  for (const [who, list] of follow) for (const k of list) await tx.insert(s.follows).values({ followerId: U[who], followeeId: U[k], createdAt: day(-20) });
+  const story = (author: PersonKey, body: string, hoursAgo: number) =>
+    tx.insert(s.posts).values({ authorId: U[author], kind: "story", title: "", body, createdAt: new Date(NOW - hoursAgo * 36e5) });
+  await story("helena", "Esta semana: o desafio de IA para o pequeno comércio está aberto. Leiam os critérios antes de submeter.", 30);
+  await story("helena", "Amanhã publico um vídeo novo nos Bastidores.", 5);
+
   // Learning --------------------------------------------------------------------
   const lessonIds: Record<string, string> = {};
   for (const [ci, c] of courseSeeds.entries()) {
@@ -220,7 +235,11 @@ export async function seedDemo(db: DB) {
     for (const [mi, m] of c.modules.entries()) {
       const mod = await tx.insert(s.modules).values({ courseId: course.id, title: m.title, position: mi }).returning({ id: s.modules.id }).then((r) => r[0]);
       for (const [li, [slug, title, dur, content]] of m.lessons.entries())
-        lessonIds[slug] = await tx.insert(s.lessons).values({ moduleId: mod.id, slug, title, durationMin: dur, content, position: li }).returning({ id: s.lessons.id }).then((r) => r[0].id);
+        lessonIds[slug] = await tx
+          .insert(s.lessons)
+          .values({ moduleId: mod.id, slug, title, durationMin: dur, content, position: li, createdAt: day(Math.min(-1, -40 + ci * 15 + mi * 3 + li)) })
+          .returning({ id: s.lessons.id })
+          .then((r) => r[0].id);
     }
   }
   const progress: [PersonKey, string[], number][] = [

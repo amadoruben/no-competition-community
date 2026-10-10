@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { Check, LoaderCircle } from "lucide-react";
+import { Check, CircleAlert, Eye, EyeOff, LoaderCircle } from "lucide-react";
 import { unstable_rethrow } from "next/navigation";
 import { createContext, startTransition, useActionState, useContext, useEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import type { ActionState } from "@/lib/action-state";
@@ -159,8 +159,9 @@ export function SubmitButton({
   );
 }
 
+/** Fields: 16 px text on phones (no zoom on focus), gold focus ring (5.8:1), red when invalid. */
 const control =
-  "w-full rounded-xl bg-surface px-3.5 text-[15px] text-ink ring-1 ring-line-strong ring-inset placeholder:text-muted transition-shadow focus:ring-2 focus:ring-ink focus:outline-none aria-[invalid=true]:ring-bad";
+  "w-full rounded-xl bg-surface px-3.5 text-[16px] text-ink ring-1 ring-line-strong ring-inset placeholder:text-muted transition-shadow hover:ring-ink/30 focus:ring-2 focus:ring-gold-strong focus:outline-none aria-[invalid=true]:ring-2 aria-[invalid=true]:ring-bad sm:text-[15px]";
 
 export function Field({
   name,
@@ -187,7 +188,8 @@ export function Field({
       </label>
       {children}
       {error ? (
-        <p id={`${id}-error`} className="text-[13px] text-bad">
+        <p id={`${id}-error`} className="flex items-center gap-1.5 text-[13px] font-medium text-bad">
+          <CircleAlert className="size-3.5 shrink-0" />
           {error}
         </p>
       ) : (
@@ -205,7 +207,28 @@ function useInvalid(name?: string, id = name) {
 
 export function Input({ className, ...props }: ComponentProps<"input">) {
   const inv = useInvalid(props.name, props.id);
-  return <input id={props.name} className={clsx(control, "h-11", className)} {...inv} {...props} />;
+  // A height passed in (e.g. h-12 on the sign-in forms) replaces the default instead of competing with it.
+  const height = /(^|\s)h-/.test(className ?? "") ? null : "h-11";
+  return <input id={props.name} className={clsx(control, height, className)} {...inv} {...props} />;
+}
+
+/** Password field with a show/hide toggle: typos are easy to miss on a phone keyboard. */
+export function PasswordInput({ className, ...props }: Omit<ComponentProps<"input">, "type">) {
+  const [shown, setShown] = useState(false);
+  return (
+    <div className="relative">
+      <Input {...props} type={shown ? "text" : "password"} className={clsx("pr-12", className)} />
+      <button
+        type="button"
+        onClick={() => setShown((s) => !s)}
+        aria-pressed={shown}
+        aria-label="Mostrar palavra-passe"
+        className="absolute inset-y-0 right-0 grid w-12 place-items-center rounded-r-xl text-muted transition-colors hover:text-ink"
+      >
+        {shown ? <EyeOff className="size-[18px]" /> : <Eye className="size-[18px]" />}
+      </button>
+    </div>
+  );
 }
 
 export function Textarea({ className, ...props }: ComponentProps<"textarea">) {

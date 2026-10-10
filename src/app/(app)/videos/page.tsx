@@ -18,7 +18,7 @@ const size = (c: Collection) => `${plural(c.lessonCount, "vídeo", "vídeos")} �
 function AccessBadge({ c }: { c: Collection }) {
   if (c.accessTier !== "full") return <Badge className="h-5 px-2 text-[11px]">Aberto a todos</Badge>;
   return (
-    <Badge tone={c.locked ? "dark" : "volt"} className="h-5 px-2 text-[11px]">
+    <Badge tone={c.locked ? "dark" : "gold"} className="h-5 px-2 text-[11px]">
       <Lock className="size-3" /> Exclusivo
     </Badge>
   );
@@ -56,22 +56,22 @@ export default async function VideosPage() {
 
       {resume && (
         <Link href={`/videos/${resume.c.slug}/${resume.v.slug}`} className="group block rounded-[22px]">
-          <div className="grid overflow-hidden rounded-[22px] bg-ink text-white shadow-[var(--shadow-card)] sm:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+          <div className="grid overflow-hidden rounded-[22px] bg-gold-soft shadow-[var(--shadow-card)] ring-1 ring-gold-line sm:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
             <VideoThumb thumbnail={resume.v.thumbnail} hue={resume.c.coverHue} seed={resume.v.slug} theme={`${resume.c.title} ${resume.v.title}`} duration={resume.v.durationMin} />
             <div className="flex flex-col justify-center p-5 sm:p-8">
-              <p className="text-[12px] font-semibold tracking-[0.12em] text-volt uppercase">Continuar a ver</p>
-              <h2 className="mt-2 font-display text-[22px] leading-tight font-semibold group-hover:underline sm:text-[26px]">{resume.v.title}</h2>
-              <p className="mt-1 text-[14px] text-white/70">{resume.c.title}</p>
+              <p className="eyebrow">Continuar a ver</p>
+              <h2 className="mt-2 font-display text-[22px] leading-tight font-bold group-hover:underline sm:text-[26px]">{resume.v.title}</h2>
+              <p className="mt-1 text-[14px] text-ink-2">{resume.c.title}</p>
               <div className="mt-5 max-w-xs">
-                <div className="mb-1.5 flex justify-between text-[12px] text-white/60">
+                <div className="mb-1.5 flex justify-between text-[12px] text-muted">
                   <span>Vistos</span>
                   <span className="tabular">{resume.c.completed}/{resume.c.videos.length}</span>
                 </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-white/15">
-                  <div className="h-full rounded-full bg-volt" style={{ width: `${(resume.c.completed / resume.c.videos.length) * 100}%` }} />
+                <div className="h-1.5 overflow-hidden rounded-full bg-white">
+                  <div className="h-full rounded-full bg-gold" style={{ width: `${(resume.c.completed / resume.c.videos.length) * 100}%` }} />
                 </div>
               </div>
-              <span className="mt-6 inline-flex items-center gap-2 self-start rounded-full bg-volt px-5 py-2.5 text-sm font-semibold text-ink transition group-hover:bg-volt-strong">
+              <span className="mt-6 inline-flex items-center gap-2 self-start rounded-full bg-gold px-5 py-2.5 text-sm font-semibold text-ink transition group-hover:bg-gold-hover">
                 <PlayCircle className="size-4" /> Continuar
               </span>
             </div>

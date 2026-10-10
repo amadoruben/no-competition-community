@@ -20,6 +20,7 @@ import {
 } from "@/db/schema";
 import { canEnroll, canSubmit, canTransition, challengePhase, STATUS_LABEL } from "@/lib/challenge-state";
 import { slugify } from "@/lib/slug";
+import { demoMode } from "./config";
 import { conflict, invalid, notFound } from "./errors";
 import { logDecision } from "./log";
 import { assertInvestor, canReview, isInvestor } from "./permissions";
@@ -398,22 +399,39 @@ export async function getChallengeForEdit(actor: User, id: string) {
   return { challenge: c, criteria: crit, prizes: prz };
 }
 
-/** Public, anonymous overview for the landing page. Published challenges only. */
-export async function publicOverview() {
-  const [open, prizeRows, [p], [m], [s]] = await Promise.all([
-    db.select().from(challenges).where(ne(challenges.status, "draft")).orderBy(asc(challenges.submissionDeadline)),
-    db.select().from(prizes).where(eq(prizes.position, 0)),
-    db.select({ n: count }).from(projects),
-    db.select({ n: count }).from(users).where(eq(users.role, "member")),
-    db.select({ n: count }).from(submissions),
-  ]);
-  return {
-    challenges: open
-      .filter((c) => ["open", "upcoming"].includes(challengePhase(c)))
-      .slice(0, 3)
-      .map((c) => ({ ...c, phase: challengePhase(c), topPrize: prizeRows.find((x) => x.challengeId === c.id) ?? null })),
-    stats: { challenges: open.length, projects: p.n, members: m.n, submissions: s.n },
-  };
+/**
+ * What an anonymous visitor sees on the landing page: published challenges that
+ * are open or about to open, with their main prize and real enrolment count.
+ * Nothing about the visitor (there is none) and nothing unpublished. Outside
+ * demo mode, challenges created by demonstration accounts never appear.
+ */
+export async function publicChallenges(limit = 6): Promise<ChallengeCard[]> {
+  const rows = await db
+    .select({
+      c: challenges,
+      demo: users.isDemo,
+      participantCount: sql<number>`(select count(*)::int from ${participations} p where p.challenge_id = "challenges"."id")`,
+    })
+    .from(challenges)
+    .innerJoin(users, eq(users.id, challenges.createdById))
+    .where(ne(challenges.status, "draft"))
+    .orderBy(asc(challenges.submissionDeadline));
+  const demo = demoMode();
+  const shown = rows.filter((r) => (demo || !r.demo) && ["open", "upcoming"].includes(challengePhase(r.c))).slice(0, limit);
+  const prizeRows = shown.length
+    ? await db.select().from(prizes).where(inArray(prizes.challengeId, shown.map((r) => r.c.id))).orderBy(asc(prizes.position))
+    : [];
+  return shown.map((r) => {
+    const top = prizeRows.find((p) => p.challengeId === r.c.id);
+    return {
+      ...r.c,
+      participantCount: r.participantCount,
+      submissionCount: 0,
+      viewerEnrolled: false,
+      viewerSubmitted: false,
+      topPrize: top ? { title: top.title, value: top.value } : null,
+    };
+  });
 }
 
 /** Podiums of challenges whose results are published (never before: evaluations stay confidential). */

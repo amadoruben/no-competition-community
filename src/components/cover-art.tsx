@@ -43,10 +43,13 @@ function seedOf(s: string) {
   return (h >>> 0) / 4294967295;
 }
 
+const GOLD = "#c39b4a";
+
 /**
- * Generated cover art: an engineering grid, the brand's ∅ ring and a theme glyph,
- * tinted by the item's hue. Self-contained (no remote images), consistent at any
- * size, and never broken. Purely decorative: give the surrounding link a name.
+ * Generated cover art: a deep jewel tone from the item's hue, fine gold
+ * orbits around the brand's ∅ ring, and a theme glyph. Self-contained (no
+ * remote images), consistent at any size, and never broken. Purely
+ * decorative: give the surrounding link a name.
  */
 export function CoverArt({
   hue,
@@ -61,24 +64,50 @@ export function CoverArt({
   glyph?: LucideIcon;
   className?: string;
   children?: ReactNode;
-  /** "deep": dark poster; "brand": ink with volt, for the community itself. */
-  tone?: "deep" | "brand";
+  /** "deep": jewel-tone poster; "brand": warm graphite, for the community itself; "light": for white pages. */
+  tone?: "deep" | "brand" | "light";
 }) {
   const r = seedOf(seed);
-  const cx_ = 98 + r * 36; // ring centre in a 160×90 frame
-  const cy_ = 42 + ((r * 7) % 1) * 10;
-  const accent = tone === "brand" ? "#d4f24a" : `hsl(${hue} 85% 68%)`;
-  const base = tone === "brand" ? "#101216" : `hsl(${hue} 34% 14%)`;
-  const glow = tone === "brand" ? "rgb(212 242 74 / 0.16)" : `hsl(${hue} 80% 50% / 0.42)`;
+  const cx_ = 100 + r * 32; // ring centre in a 160×90 frame
+  const cy_ = 40 + ((r * 7) % 1) * 12;
+  const light = tone === "light";
+  const base = tone === "brand" ? "#1f1c17" : light ? `hsl(${hue} 28% 95%)` : `hsl(${hue} 38% 19%)`;
+  const glow = tone === "brand" ? "rgb(195 155 74 / 0.22)" : light ? "rgb(195 155 74 / 0.16)" : `hsl(${hue} 42% 36% / 0.85)`;
+  const disk = light ? "#ffffff" : base;
+  const glyphColor = light ? `hsl(${hue} 36% 28%)` : "rgb(255 255 255 / 0.94)";
   return (
     <div className={clsx("relative isolate overflow-hidden", className)} style={{ backgroundColor: base }}>
-      <div aria-hidden className="absolute inset-0" style={{ background: `radial-gradient(110% 100% at ${(cx_ / 160) * 100}% ${(cy_ / 90) * 100}%, ${glow}, transparent 62%)` }} />
-      <div aria-hidden className="cover-grid absolute inset-0 opacity-70" />
+      <div aria-hidden className="absolute inset-0" style={{ background: `radial-gradient(95% 110% at ${(cx_ / 160) * 100}% ${(cy_ / 90) * 100}%, ${glow}, transparent 66%)` }} />
+      <div aria-hidden className={clsx("absolute inset-0", light ? "paper-grid opacity-60" : "cover-grid opacity-80")} />
       <svg aria-hidden viewBox="0 0 160 90" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 size-full">
-        <path d={`M${cx_ - 30} ${cy_ + 30} L${cx_ + 30} ${cy_ - 30}`} stroke={accent} strokeWidth="4.5" strokeLinecap="round" opacity="0.55" />
-        <circle cx={cx_} cy={cy_} r="21" fill={base} />
-        <circle cx={cx_} cy={cy_} r="30" fill="none" stroke={accent} strokeWidth="4.5" />
-        <Glyph x={cx_ - 13} y={cy_ - 13} width={26} height={26} strokeWidth={1.4} color="rgb(255 255 255 / 0.92)" />
+        <circle cx={cx_} cy={cy_} r="58" fill="none" stroke={GOLD} strokeWidth="0.6" opacity={light ? 0.45 : 0.3} />
+        <circle cx={cx_} cy={cy_} r="44" fill="none" stroke={GOLD} strokeWidth="0.8" opacity={light ? 0.6 : 0.42} />
+        <path d={`M${cx_ - 31} ${cy_ + 31} L${cx_ + 31} ${cy_ - 31}`} stroke={GOLD} strokeWidth="2.2" strokeLinecap="round" opacity="0.9" />
+        <circle cx={cx_} cy={cy_} r="23" fill={disk} />
+        <circle cx={cx_} cy={cy_} r="29" fill="none" stroke={GOLD} strokeWidth="2.2" />
+        <Glyph x={cx_ - 12} y={cy_ - 12} width={24} height={24} strokeWidth={1.4} color={glyphColor} />
+      </svg>
+      {children && <div className="relative z-10 h-full">{children}</div>}
+    </div>
+  );
+}
+
+/**
+ * The community's own banner: warm paper, a hairline grid and fine gold orbits
+ * around the ring of the ∅ mark, with no theme glyph. For headers on white
+ * pages (the member home, the landing page's illustrations). Decorative.
+ */
+export function CommunityBanner({ className, children }: { className?: string; children?: ReactNode }) {
+  return (
+    <div className={clsx("relative isolate overflow-hidden bg-gold-soft", className)}>
+      <div aria-hidden className="paper-grid absolute inset-0 opacity-70" />
+      <svg aria-hidden viewBox="0 0 400 100" preserveAspectRatio="xMaxYMid slice" className="absolute inset-0 size-full">
+        <g fill="none" stroke={GOLD} strokeLinecap="round">
+          <circle cx="332" cy="50" r="122" strokeWidth="0.6" opacity="0.35" />
+          <circle cx="332" cy="50" r="88" strokeWidth="0.8" opacity="0.5" />
+          <circle cx="332" cy="50" r="52" strokeWidth="2.2" opacity="0.9" />
+          <path d="M290 92 374 8" strokeWidth="2.2" opacity="0.9" />
+        </g>
       </svg>
       {children && <div className="relative z-10 h-full">{children}</div>}
     </div>
@@ -88,7 +117,7 @@ export function CoverArt({
 /** Small square mark for lists: the cover's colours and glyph, centred. Pass the display class (e.g. `grid`). */
 export function CoverTile({ hue, glyph: Glyph = Lightbulb, className }: { hue: number; glyph?: LucideIcon; className?: string }) {
   return (
-    <span aria-hidden className={clsx("shrink-0 place-items-center", className)} style={{ backgroundColor: `hsl(${hue} 34% 14%)`, color: `hsl(${hue} 85% 68%)` }}>
+    <span aria-hidden className={clsx("shrink-0 place-items-center", className)} style={{ backgroundColor: `hsl(${hue} 38% 19%)`, color: GOLD }}>
       <Glyph className="size-5" strokeWidth={1.75} />
     </span>
   );

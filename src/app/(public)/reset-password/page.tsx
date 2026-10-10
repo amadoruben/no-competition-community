@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Notice } from "@/components/ui";
 import { TOKEN_HASH_PREFIX } from "@/lib/auth-links";
-import { AuthShell } from "../auth-shell";
+import { AuthAside, AuthShell } from "../auth-shell";
 import { ResetForm } from "./reset-form";
 
 export const metadata: Metadata = { title: "Nova palavra-passe" };
@@ -13,7 +13,11 @@ export default async function ResetPasswordPage(props: PageProps<"/reset-passwor
   const token =
     typeof sp.token === "string" ? sp.token : typeof sp.code === "string" ? sp.code : typeof sp.token_hash === "string" ? `${TOKEN_HASH_PREFIX}${sp.token_hash}` : "";
   return (
-    <AuthShell title="Nova palavra-passe" subtitle="Escolha uma palavra-passe com pelo menos 8 caracteres." aside={<h2 className="font-display text-4xl leading-tight font-semibold">Todas as sessões anteriores serão terminadas.</h2>}>
+    <AuthShell
+      title="Nova palavra-passe"
+      subtitle="Escolha uma palavra-passe com pelo menos 8 caracteres."
+      aside={<AuthAside title="Uma palavra-passe nova, um acesso seguro." points={["Use pelo menos 8 caracteres.", "Depois de guardar, entra directamente na comunidade."]} />}
+    >
       {token ? (
         <ResetForm token={token} />
       ) : (

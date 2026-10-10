@@ -24,7 +24,7 @@ export const ROLE_LABEL: Record<Role, string> = {
 export const PHASE_TONE: Record<ChallengePhase, Tone> = {
   draft: "neutral",
   upcoming: "info",
-  open: "volt",
+  open: "gold",
   paused: "warn",
   reviewing: "violet",
   results: "dark",
@@ -44,7 +44,7 @@ export const SUBMISSION_STATUS_LABEL: Record<SubmissionStatus, string> = {
 
 export const SUBMISSION_STATUS_TONE: Record<SubmissionStatus, Tone> = {
   submitted: "neutral",
-  shortlisted: "volt",
+  shortlisted: "gold",
   not_selected: "bad",
 };
 

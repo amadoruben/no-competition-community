@@ -21,7 +21,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           <TopNav handle={user.handle} />
           <div className="ml-auto flex items-center gap-2">
             {user.isDemo && (
-              <Link href="/demo" className="hidden h-8 items-center rounded-full bg-volt-soft px-3 text-[11px] font-semibold tracking-wide text-ink uppercase ring-1 ring-volt-strong/50 hover:bg-volt sm:inline-flex" title="Abrir a visita guiada">
+              <Link href="/demo" className="hidden h-8 items-center rounded-full bg-gold-soft px-3 text-[11px] font-semibold tracking-wide text-ink uppercase ring-1 ring-gold-strong/50 hover:bg-gold sm:inline-flex" title="Abrir a visita guiada">
                 Demonstração
               </Link>
             )}
@@ -33,10 +33,10 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       <main id="main" tabIndex={-1} className="mx-auto w-full max-w-[1180px] flex-1 px-4 py-6 outline-none sm:px-6 lg:px-8 lg:py-8">
         {children}
       </main>
-      <footer className="border-t border-line px-4 pt-5 pb-24 text-center text-[12px] text-muted sm:px-6 lg:pb-5">
+      <footer className="border-t border-line px-4 pt-5 pb-28 text-center text-[12px] text-muted sm:px-6 lg:pb-5">
         No Competition Community{user.isDemo ? " · Dados de demonstração fictícios" : ""}
       </footer>
-      <MobileTabs handle={user.handle} />
+      <MobileTabs handle={user.handle} me={{ name: user.name, hue: user.avatarHue, fileId: user.avatarFileId }} />
       <Toaster />
     </div>
   );

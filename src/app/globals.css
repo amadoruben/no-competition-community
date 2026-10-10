@@ -2,45 +2,56 @@
 
 /*
  * No Competition Community — design tokens.
- * Ink on warm paper, with a single high-energy accent ("volt") reserved for
- * the primary action and for marking what matters now. Status colours are
- * functional only.
+ *
+ * White page, light and dark greys for structure, near-black warm ink for
+ * text, and one elegant gold used sparingly: active states, highlights and
+ * the primary call to action. Gold never carries body text on white
+ * (2.6:1); `gold-strong` does (5.8:1). Status colours are functional only.
  */
 @theme {
   --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-bricolage), var(--font-geist), ui-sans-serif, sans-serif;
+  --font-display: var(--font-jakarta), var(--font-geist), ui-sans-serif, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 
-  --color-paper: #f4f3ee;
-  --color-surface: #ffffff;
-  --color-sunken: #eeece5;
-  --color-line: #e4e1d8;
-  --color-line-strong: #cdc9bd;
+  /* Surfaces */
+  --color-paper: #ffffff; /* page */
+  --color-surface: #ffffff; /* cards, menus */
+  --color-mist: #f7f7f5; /* alternating sections, side panels */
+  --color-sunken: #f1f1ee; /* fields, chips, placeholders */
+  --color-line: #e7e6e1; /* hairlines */
+  --color-line-strong: #d3d1ca; /* field borders, dividers that must be seen */
+  --color-graphite: #2a2723; /* dark grey structure, used sparingly */
 
-  --color-ink: #101216;
-  --color-ink-2: #383d45;
-  --color-muted: #62666e; /* ≥4.9:1 on paper, surface and sunken (WCAG AA text) */
-  --color-faint: #868a92; /* decorative only: icons, rules (≥3:1 on surface); never body text */
+  /* Text */
+  --color-ink: #16130e; /* 18.5:1 on white */
+  --color-ink-2: #3d3a34;
+  --color-muted: #6b6862; /* 5.3:1 on white, 4.9:1 on mist (WCAG AA text) */
+  --color-faint: #9c9992; /* decorative only: icons, rules; never body text */
 
-  --color-volt: #d4f24a;
-  --color-volt-strong: #b9dc1d;
-  --color-volt-soft: #f1fbcc;
+  /* Brand accent */
+  --color-gold: #c39b4a; /* fills and lines; ink on gold 7.2:1 */
+  --color-gold-hover: #b38a3b;
+  --color-gold-strong: #80611f; /* gold text and icons on white, 5.8:1 */
+  --color-gold-soft: #faf5ea; /* selected and highlighted backgrounds */
+  --color-gold-line: #ead9b4; /* borders of gold-tinted elements */
 
+  /* Status */
   --color-ok: #17704d;
-  --color-ok-soft: #e1f3ea;
-  --color-warn: #a2500a;
-  --color-warn-soft: #fcefdc;
+  --color-ok-soft: #e4f3eb;
+  --color-warn: #9a4d0b;
+  --color-warn-soft: #fcf0de;
   --color-bad: #b42339;
-  --color-bad-soft: #fbe5e8;
+  --color-bad-soft: #fbe7ea;
   --color-info: #2846c2;
-  --color-info-soft: #e5eafc;
+  --color-info-soft: #e8ecfc;
   --color-violet: #6d3fc0;
-  --color-violet-soft: #efe8fb;
+  --color-violet-soft: #f0e9fb;
   --color-heart: #e0284a; /* reactions only */
 
   --radius-card: 16px;
-  --shadow-card: 0 1px 2px rgb(16 18 22 / 0.05);
-  --shadow-pop: 0 12px 32px -12px rgb(16 18 22 / 0.28), 0 2px 6px -2px rgb(16 18 22 / 0.08);
+  --shadow-card: 0 1px 2px rgb(22 19 14 / 0.04);
+  --shadow-pop: 0 16px 40px -16px rgb(22 19 14 / 0.22), 0 2px 6px -2px rgb(22 19 14 / 0.06);
+  --shadow-float: 0 30px 60px -30px rgb(22 19 14 / 0.25), 0 10px 24px -12px rgb(22 19 14 / 0.12);
 
   --animate-rise: rise 0.35s cubic-bezier(0.2, 0.7, 0.2, 1) both;
   --animate-pop: pop 0.32s cubic-bezier(0.3, 1.6, 0.5, 1);
@@ -58,14 +69,22 @@ body {
 }
 
 ::selection {
-  background: var(--color-volt);
+  background: #f1e3c3;
   color: var(--color-ink);
 }
 
 .font-display {
   font-family: var(--font-display);
-  font-optical-sizing: auto;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
+}
+
+/* Small uppercase label above headings ("eyebrow"). */
+.eyebrow {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-gold-strong);
 }
 
 .tabular {
@@ -101,12 +120,20 @@ body {
   }
 }
 
-/* Engineering grid used by generated cover art (see components/cover-art.tsx). */
+/* Fine grid used by generated cover art (see components/cover-art.tsx). */
 .cover-grid {
   background-image:
-    linear-gradient(rgb(255 255 255 / 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(255 255 255 / 0.06) 1px, transparent 1px);
+    linear-gradient(rgb(255 255 255 / 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.05) 1px, transparent 1px);
   background-size: 28px 28px;
+}
+
+/* Hairline grid for light surfaces (landing, auth panel). */
+.paper-grid {
+  background-image:
+    linear-gradient(rgb(22 19 14 / 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(22 19 14 / 0.045) 1px, transparent 1px);
+  background-size: 32px 32px;
 }
 
 /* Legacy hue cover, still used by a few compact surfaces. */

@@ -394,7 +394,7 @@ function Compare({ board, ids, challengeId }: { board: ReviewBoard; ids: string[
                           ) : (
                             <div className="flex items-center gap-2">
                               <div className="h-2 w-20 overflow-hidden rounded-full bg-sunken">
-                                <div className={cx("h-full rounded-full", v === max ? "bg-volt-strong" : "bg-ink/70")} style={{ width: `${v * 10}%` }} />
+                                <div className={cx("h-full rounded-full", v === max ? "bg-gold-strong" : "bg-ink/70")} style={{ width: `${v * 10}%` }} />
                               </div>
                               <span className={cx("tabular font-mono", v === max && "font-semibold")}>{fmtScore(v)}</span>
                             </div>

@@ -13,7 +13,7 @@ export function AuthorBadge({ name, handle, role, className }: { name: string; h
       </Link>
       {role === "investor" && (
         <span role="img" aria-label="Conta oficial No Competition" title="Conta oficial No Competition" className="shrink-0">
-          <BadgeCheck aria-hidden className="size-[17px] fill-ink text-volt" />
+          <BadgeCheck aria-hidden className="size-[17px] fill-ink text-gold" />
         </span>
       )}
       {role === "evaluator" && <span className="shrink-0 rounded-full bg-violet-soft px-1.5 py-px text-[11px] font-medium text-violet">{ROLE_LABEL.evaluator}</span>}

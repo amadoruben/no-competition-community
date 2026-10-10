@@ -7,7 +7,7 @@ import { auth } from "@/server/auth";
 import { demoMode } from "@/server/config";
 import { currentUser, homeFor } from "@/server/session";
 import { Notice } from "@/components/ui";
-import { AuthShell } from "../auth-shell";
+import { AuthAside, AuthShell } from "../auth-shell";
 import { LoginForm } from "./login-form";
 import { ResendConfirmation } from "./resend-confirmation";
 
@@ -27,21 +27,21 @@ export default async function LoginPage(props: PageProps<"/login">) {
   const canResend = !!auth().resendConfirmation;
   return (
     <AuthShell
+      mode="login"
       title="Bem-vindo de volta"
-      subtitle={demo ? "Entre na sua conta ou explore com uma conta de demonstração." : "Entre na sua conta."}
+      subtitle={demo ? "Entre na sua conta ou explore com uma conta de demonstração." : "Entre com o email e a palavra-passe da sua conta."}
       aside={
         demo ? (
-        <>
-          <p className="text-[13px] font-semibold tracking-wide text-volt uppercase">Demonstração</p>
-          <h2 className="mt-3 font-display text-4xl leading-tight font-semibold">Veja a plataforma de cada lado da mesa.</h2>
-          <p className="mt-4 max-w-md text-white/70">As contas de demonstração usam dados fictícios. Pode criar, submeter e publicar à vontade — repõe-se com <code className="rounded bg-white/10 px-1.5 py-0.5 text-[13px]">npm run db:seed</code>.</p>
-        </>
+          <AuthAside
+            title="Veja a plataforma de cada lado da mesa."
+            points={[
+              "As contas de demonstração usam dados fictícios.",
+              "Membro, avaliadora ou investidora: cada papel vê o que lhe compete.",
+              "Pode publicar, submeter e avaliar sem afectar contas reais.",
+            ]}
+          />
         ) : (
-          <>
-            <p className="text-[13px] font-semibold tracking-wide text-volt uppercase">Comunidade No Competition</p>
-            <h2 className="mt-3 font-display text-4xl leading-tight font-semibold">O que é novo desde a última visita está no Início.</h2>
-            <p className="mt-4 max-w-md text-white/70">Anúncios oficiais, vídeos exclusivos e desafios abertos.</p>
-          </>
+          <AuthAside title="O que é novo desde a última visita está no Início." />
         )
       }
     >
@@ -50,47 +50,43 @@ export default async function LoginPage(props: PageProps<"/login">) {
       {sp.error === "link" && <Notice tone="bad" className="mb-6">O link expirou ou já foi utilizado. Entre com a sua palavra-passe ou peça um novo link.</Notice>}
       {sp.error === "demo" && <Notice tone="bad" className="mb-6">Não foi possível entrar com a conta de demonstração. Tente novamente.</Notice>}
       {demo && (
-      <>
-      <div className="space-y-2">
-        <div className="flex items-baseline justify-between">
-          <p className="text-[13px] font-medium text-muted">Entrar com um clique</p>
-          <Link href="/demo" className="text-[13px] font-medium underline-offset-4 hover:underline">Visita guiada →</Link>
-        </div>
-        {demos.map(({ email, icon: Icon, title, who, body }) => (
-          <form key={email} action={demoLoginAction}>
-            <input type="hidden" name="email" value={email} />
-            <button className="group flex w-full items-center gap-3 rounded-2xl bg-surface p-3 text-left ring-1 ring-line transition hover:ring-ink">
-              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-volt-soft ring-1 ring-volt-strong/40">
-                <Icon className="size-5" />
-              </span>
-              <span className="min-w-0">
-                <span className="block text-sm font-semibold">
-                  {title} <span className="font-normal text-muted">· {who}</span>
-                </span>
-                <span className="block truncate text-[13px] text-muted">{body}</span>
-              </span>
-            </button>
-          </form>
-        ))}
-      </div>
-      <div className="my-8 flex items-center gap-3 text-[12px] text-muted">
-        <span className="h-px flex-1 bg-line" /> ou com email <span className="h-px flex-1 bg-line" />
-      </div>
-      </>
+        <>
+          <div className="space-y-2">
+            <div className="flex items-baseline justify-between">
+              <p className="text-[13px] font-medium text-muted">Entrar com um clique</p>
+              <Link href="/demo" className="text-[13px] font-medium text-gold-strong underline-offset-4 hover:underline">
+                Visita guiada →
+              </Link>
+            </div>
+            {demos.map(({ email, icon: Icon, title, who, body }) => (
+              <form key={email} action={demoLoginAction}>
+                <input type="hidden" name="email" value={email} />
+                <button className="group flex w-full items-center gap-3 rounded-2xl bg-surface p-3 text-left ring-1 ring-line transition hover:bg-mist hover:ring-ink/25">
+                  <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-gold-soft text-gold-strong ring-1 ring-gold-line">
+                    <Icon className="size-5" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold">
+                      {title} <span className="font-normal text-muted">· {who}</span>
+                    </span>
+                    <span className="block truncate text-[13px] text-muted">{body}</span>
+                  </span>
+                </button>
+              </form>
+            ))}
+          </div>
+          <div className="my-8 flex items-center gap-3 text-[12px] text-muted">
+            <span className="h-px flex-1 bg-line" /> ou com email <span className="h-px flex-1 bg-line" />
+          </div>
+        </>
       )}
+      {/*
+        Other sign-in methods (Google, Apple…) belong here, above the email form,
+        once a provider is configured in Supabase Auth and wired through
+        AuthProvider. None is configured, so none is shown.
+      */}
       <LoginForm next={typeof sp.next === "string" ? sp.next : undefined} />
-      <p className="mt-4 text-center text-sm">
-        <Link href="/forgot-password" className="text-muted underline-offset-4 hover:text-ink hover:underline">
-          Esqueceu-se da palavra-passe?
-        </Link>
-      </p>
       {canResend && <ResendConfirmation open={!!sp.confirm} />}
-      <p className="mt-6 text-center text-sm text-muted">
-        Ainda não tem conta?{" "}
-        <Link href="/register" className="font-medium text-ink underline underline-offset-4">
-          Criar conta
-        </Link>
-      </p>
     </AuthShell>
   );
 }

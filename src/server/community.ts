@@ -1,8 +1,8 @@
-import { and, count, desc, eq, inArray, isNull, lte, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, lte, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { db } from "@/db";
-import { challenges, comments, postMedia, posts, POST_KINDS, projects, reactions, savedPosts, users, type PostKind, type User } from "@/db/schema";
+import { challenges, comments, postMedia, posts, POST_KINDS, projects, REACTION_KINDS, reactions, savedPosts, users, type AnyPostKind, type ReactionKind, type User } from "@/db/schema";
 import { videoSource } from "@/lib/video";
 import { forbidden, invalid, notFound } from "./errors";
 import { discard, readImage, store } from "./files";
@@ -36,6 +36,7 @@ function postQuery(viewer: User) {
       commentCount: sql<number>`(select count(*)::int from ${comments} c where c.post_id = "posts"."id")`,
       reactionCount: sql<number>`(select count(*)::int from ${reactions} r where r.post_id = "posts"."id")`,
       viewerReacted: sql<boolean>`exists(select 1 from ${reactions} r where r.post_id = "posts"."id" and r.user_id = ${viewer.id})`,
+      viewerReaction: sql<ReactionKind | null>`(select r.kind from ${reactions} r where r.post_id = "posts"."id" and r.user_id = ${viewer.id})`,
       viewerSaved: sql<boolean>`exists(select 1 from ${savedPosts} s where s.post_id = "posts"."id" and s.user_id = ${viewer.id})`,
     })
     .from(posts)
@@ -47,7 +48,7 @@ function postQuery(viewer: User) {
 
 export type PostMedia = { fileId: string; width: number; height: number };
 
-async function mediaFor(postIds: string[]) {
+export async function mediaFor(postIds: string[]) {
   const map = new Map<string, PostMedia[]>();
   if (!postIds.length) return map;
   const rows = await db
@@ -56,6 +57,22 @@ async function mediaFor(postIds: string[]) {
     .where(inArray(postMedia.postId, postIds))
     .orderBy(postMedia.postId, postMedia.position);
   for (const { postId, ...m } of rows) map.set(postId, [...(map.get(postId) ?? []), m]);
+  return map;
+}
+
+export type ReactionCount = { kind: ReactionKind; n: number };
+
+/** How many of each reaction every post has, most used first. */
+async function reactionsFor(postIds: string[]) {
+  const map = new Map<string, ReactionCount[]>();
+  if (!postIds.length) return map;
+  const rows = await db
+    .select({ postId: reactions.postId, kind: reactions.kind, n: count() })
+    .from(reactions)
+    .where(inArray(reactions.postId, postIds))
+    .groupBy(reactions.postId, reactions.kind);
+  for (const r of rows) map.set(r.postId, [...(map.get(r.postId) ?? []), { kind: r.kind, n: r.n }]);
+  for (const list of map.values()) list.sort((a, b) => b.n - a.n || REACTION_KINDS.indexOf(a.kind) - REACTION_KINDS.indexOf(b.kind));
   return map;
 }
 
@@ -95,11 +112,26 @@ async function threadOf(postId: string) {
 export type FeedItem = Awaited<ReturnType<typeof listFeed>>["items"][number];
 export type FeedComment = FeedItem["comments"][number];
 
-export async function listFeed(viewer: User, opts: { kind?: PostKind; saved?: boolean; limit?: number; page?: number; authorId?: string } = {}) {
+/** Kinds that live in the feed (stories have their own bar). */
+const IN_FEED: AnyPostKind[] = [...POST_KINDS, "social"];
+
+export async function listFeed(
+  viewer: User,
+  opts: {
+    kind?: AnyPostKind;
+    /** Restrict to these kinds (a profile shows the member's own posts, not shared publications). */
+    kinds?: readonly AnyPostKind[];
+    saved?: boolean;
+    limit?: number;
+    page?: number;
+    authorId?: string;
+  } = {},
+) {
   const limit = opts.limit ?? 20;
   const page = Math.max(1, opts.page ?? 1);
   const where = and(
     sameSide(viewer),
+    inArray(posts.kind, opts.kinds ? IN_FEED.filter((k) => opts.kinds!.includes(k)) : IN_FEED),
     opts.kind ? eq(posts.kind, opts.kind) : undefined,
     opts.authorId ? eq(posts.authorId, opts.authorId) : undefined,
     opts.saved ? sql`exists(select 1 from ${savedPosts} s where s.post_id = "posts"."id" and s.user_id = ${viewer.id})` : undefined,
@@ -115,9 +147,16 @@ export async function listFeed(viewer: User, opts: { kind?: PostKind; saved?: bo
     db.select({ total: count() }).from(posts).innerJoin(users, eq(users.id, posts.authorId)).where(where),
   ]);
   const ids = rows.map((r) => r.post.id);
-  const [media, preview] = await Promise.all([mediaFor(ids), previewComments(ids)]);
+  const [media, preview, counts] = await Promise.all([mediaFor(ids), previewComments(ids), reactionsFor(ids)]);
   return {
-    items: rows.map((r) => ({ ...r, viewerReacted: !!r.viewerReacted, viewerSaved: !!r.viewerSaved, media: media.get(r.post.id) ?? [], comments: preview.get(r.post.id) ?? [] })),
+    items: rows.map((r) => ({
+      ...r,
+      viewerReacted: !!r.viewerReacted,
+      viewerSaved: !!r.viewerSaved,
+      reactions: counts.get(r.post.id) ?? [],
+      media: media.get(r.post.id) ?? [],
+      comments: preview.get(r.post.id) ?? [],
+    })),
     total,
     page,
     pages: Math.max(1, Math.ceil(total / limit)),
@@ -125,10 +164,10 @@ export async function listFeed(viewer: User, opts: { kind?: PostKind; saved?: bo
 }
 
 export async function getPost(viewer: User, postId: string) {
-  const [row] = isUuid(postId) ? await postQuery(viewer).where(and(eq(posts.id, postId), sameSide(viewer))).limit(1) : [];
+  const [row] = isUuid(postId) ? await postQuery(viewer).where(and(eq(posts.id, postId), sameSide(viewer), ne(posts.kind, "story"))).limit(1) : [];
   if (!row) throw notFound("Publicação não encontrada.");
-  const [media, thread] = await Promise.all([mediaFor([postId]), threadOf(postId)]);
-  return { ...row, viewerReacted: !!row.viewerReacted, viewerSaved: !!row.viewerSaved, media: media.get(postId) ?? [], comments: thread };
+  const [media, thread, counts] = await Promise.all([mediaFor([postId]), threadOf(postId), reactionsFor([postId])]);
+  return { ...row, viewerReacted: !!row.viewerReacted, viewerSaved: !!row.viewerSaved, reactions: counts.get(postId) ?? [], media: media.get(postId) ?? [], comments: thread };
 }
 
 /** A post the viewer may see and interact with (same demo/real side), or not found. */
@@ -138,7 +177,8 @@ async function visiblePost(viewer: User, postId: string) {
         .select({ id: posts.id, authorId: posts.authorId, kind: posts.kind, title: posts.title, body: posts.body, videoUrl: posts.videoUrl })
         .from(posts)
         .innerJoin(users, eq(users.id, posts.authorId))
-        .where(and(eq(posts.id, postId), sameSide(viewer)))
+        // Stories have their own rules (no comments, saves or edits): see stories.ts.
+        .where(and(eq(posts.id, postId), sameSide(viewer), ne(posts.kind, "story")))
         .limit(1)
     : [];
   if (!p) throw notFound("Publicação não encontrada.");
@@ -201,6 +241,7 @@ const editInput = z.object({
 /** Only the author edits the text (title, body, type); photos and video stay as published. */
 export async function updatePost(actor: User, postId: string, input: unknown) {
   const p = await visiblePost(actor, postId);
+  if (p.kind === "social") throw forbidden("As publicações das redes sociais editam-se em Administração → Conteúdos sociais.");
   if (p.authorId !== actor.id) throw forbidden("Só o autor pode editar esta publicação.");
   const v = parse(editInput, input);
   if (v.kind === "announcement" && !isInvestor(actor)) throw forbidden("Apenas a equipa No Competition pode publicar anúncios oficiais.");
@@ -241,18 +282,22 @@ export async function deleteComment(actor: User, commentId: string) {
   await db.delete(comments).where(eq(comments.id, c.id));
 }
 
-const reactionCount = async (postId: string) => (await db.select({ n: count() }).from(reactions).where(eq(reactions.postId, postId)))[0].n;
-
 /**
- * One reaction per member per post (the primary key enforces it): pressing again
- * removes it. Returns the persisted state and the real count.
+ * One reaction per member per post (the primary key enforces it). Choosing the
+ * same one again removes it; choosing another replaces it. Returns the stored
+ * state and the real counts.
  */
-export async function toggleReaction(actor: User, postId: string) {
+export async function toggleReaction(actor: User, postId: string, kind: unknown = "heart") {
+  const k = parse(z.enum(REACTION_KINDS), kind);
   const p = await visiblePost(actor, postId);
   const where = and(eq(reactions.postId, p.id), eq(reactions.userId, actor.id));
-  const removed = await db.delete(reactions).where(where).returning();
-  if (!removed.length) await db.insert(reactions).values({ postId: p.id, userId: actor.id }).onConflictDoNothing();
-  return { active: !removed.length, count: await reactionCount(p.id) };
+  const [mine] = await db.select({ kind: reactions.kind }).from(reactions).where(where).limit(1);
+  if (mine?.kind === k) await db.delete(reactions).where(where);
+  else if (mine) await db.update(reactions).set({ kind: k, createdAt: new Date() }).where(where);
+  else await db.insert(reactions).values({ postId: p.id, userId: actor.id, kind: k }).onConflictDoUpdate({ target: [reactions.postId, reactions.userId], set: { kind: k } });
+  const counts = (await reactionsFor([p.id])).get(p.id) ?? [];
+  const active = mine?.kind !== k;
+  return { active, kind: active ? k : null, count: counts.reduce((t, c) => t + c.n, 0), counts };
 }
 
 /** Saved posts are private to the member who saved them. */

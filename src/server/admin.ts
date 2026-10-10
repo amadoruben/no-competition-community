@@ -9,7 +9,7 @@ import { listOpportunities } from "./review";
 
 export interface NextAction {
   label: string;
-  tone: "volt" | "warn" | "info" | "neutral";
+  tone: "gold" | "warn" | "info" | "neutral";
 }
 
 export interface ChallengeRow {
@@ -69,12 +69,12 @@ async function challengeRows(viewer: User, onlyAssigned = false): Promise<Challe
     const expected = cSubs.length * evaluatorCount;
 
     let next: NextAction;
-    if (c.status === "draft") next = { label: "Rever e publicar", tone: "volt" };
+    if (c.status === "draft") next = { label: "Rever e publicar", tone: "gold" };
     else if (phase === "results") next = { label: "Concluído", tone: "neutral" };
-    else if (resultsConfirmed > 0) next = { label: "Publicar resultados", tone: "volt" };
+    else if (resultsConfirmed > 0) next = { label: "Publicar resultados", tone: "gold" };
     else if (phase === "reviewing" && c.status === "published") next = { label: "Prazo terminado — encerrar submissões", tone: "warn" };
     else if (c.status === "closed")
-      next = cEvals.length < expected ? { label: `Avaliações ${cEvals.length}/${expected}`, tone: "info" } : { label: "Confirmar resultados", tone: "volt" };
+      next = cEvals.length < expected ? { label: `Avaliações ${cEvals.length}/${expected}`, tone: "info" } : { label: "Confirmar resultados", tone: "gold" };
     else if (phase === "paused") next = { label: "Em pausa — retomar ou encerrar", tone: "warn" };
     else if (phase === "upcoming") next = { label: "Aguarda abertura", tone: "neutral" };
     else next = { label: `${cSubs.length} ${cSubs.length === 1 ? "submissão recebida" : "submissões recebidas"}`, tone: "info" };

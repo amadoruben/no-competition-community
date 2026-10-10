@@ -123,12 +123,12 @@ test("feed: photos, reactions, saved posts and replies persist", async ({ browse
   const seen = postCard(other, title);
   await seen.getByRole("button", { name: "Gosto" }).click();
   await expect(seen.getByRole("button", { name: "Retirar gosto" })).toHaveAttribute("aria-pressed", "true");
-  await expect(seen.getByText("1 gosto")).toBeVisible();
+  await expect(seen.getByRole("button", { name: "Retirar gosto" })).toContainText("1");
   await seen.getByRole("button", { name: "Guardar" }).click();
   await expect(seen.getByRole("button", { name: "Remover dos guardados" })).toBeVisible();
   await other.reload();
   await expect(postCard(other, title).getByRole("button", { name: "Retirar gosto" })).toBeVisible();
-  await expect(postCard(other, title).getByText("1 gosto")).toBeVisible();
+  await expect(postCard(other, title).getByRole("button", { name: "Retirar gosto" })).toContainText("1");
   await other.goto("/dashboard?f=saved");
   await expect(postCard(other, title)).toBeVisible();
   // Saved posts are private: the author's saved list does not have it.
