@@ -1,0 +1,85 @@
+name: Database backup
+
+# Independent, provider-agnostic backups: a physical pg_dump and a logical
+# checksummed export, both restored into a scratch PostgreSQL and verified on
+# every run, then encrypted and kept as artifacts.
+#
+# Repository secrets:
+#   BACKUP_DATABASE_URL    direct or session-mode connection (port 5432); a read-only role is enough
+#   BACKUP_ENCRYPTION_KEY  long random passphrase — keep a copy outside GitHub
+# Does nothing until BACKUP_DATABASE_URL is set.
+
+on:
+  schedule:
+    - cron: "17 3 * * *" # daily 03:17 UTC
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    services:
+      restore:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      SOURCE: ${{ secrets.BACKUP_DATABASE_URL }}
+      KEY: ${{ secrets.BACKUP_ENCRYPTION_KEY }}
+      PGPASSWORD: postgres
+      RESTORE: postgres://postgres:postgres@localhost:5433
+    steps:
+      - name: Not configured
+        if: env.SOURCE == ''
+        run: echo "BACKUP_DATABASE_URL is not set; skipping."
+      - uses: actions/checkout@v4
+        if: env.SOURCE != ''
+      - uses: actions/setup-node@v4
+        if: env.SOURCE != ''
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install PostgreSQL 17 client (pg_dump must be >= server version)
+        if: env.SOURCE != ''
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client-17
+      - run: npm ci
+        if: env.SOURCE != ''
+      - name: Physical dump (application schemas only)
+        if: env.SOURCE != ''
+        run: |
+          mkdir -p backups
+          /usr/lib/postgresql/17/bin/pg_dump "$SOURCE" -Fc --no-owner --no-privileges -n public -n drizzle -f backups/ncc.dump
+      - name: Logical export (portable JSON with checksums)
+        if: env.SOURCE != ''
+        run: DATABASE_URL="$SOURCE" npm run db:export -- --out backups/ncc.json
+      - name: Restore test — physical dump
+        if: env.SOURCE != ''
+        run: |
+          psql "$RESTORE/postgres" -c "create database restore_phys"
+          psql "$RESTORE/restore_phys" -c "drop schema public cascade"   # the dump recreates it
+          /usr/lib/postgresql/17/bin/pg_restore -d "$RESTORE/restore_phys" --no-owner --no-privileges backups/ncc.dump
+          DATABASE_URL=$RESTORE/restore_phys npm run db:verify -- backups/ncc.json
+      - name: Restore test — logical export
+        if: env.SOURCE != ''
+        run: |
+          psql "$RESTORE/postgres" -c "create database restore_logical"
+          DATABASE_URL=$RESTORE/restore_logical npm run db:import -- backups/ncc.json
+      - name: Encrypt
+        if: env.SOURCE != ''
+        run: |
+          test -n "$KEY" || { echo "BACKUP_ENCRYPTION_KEY is required"; exit 1; }
+          for f in backups/ncc.dump backups/ncc.json; do
+            openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -in "$f" -out "$f.enc" -pass env:KEY && rm "$f"
+          done
+      - uses: actions/upload-artifact@v4
+        if: env.SOURCE != ''
+        with:
+          name: ncc-backup-${{ github.run_id }}
+          path: backups/*.enc
+          retention-days: 30

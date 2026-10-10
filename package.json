@@ -1,0 +1,61 @@
+{
+  "name": "no-competition-community",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "next typegen && tsc --noEmit",
+    "test": "vitest run",
+    "test:e2e": "next build && playwright test",
+    "db:generate": "drizzle-kit generate",
+    "db:seed": "tsx --env-file-if-exists=.env.local src/db/seed.ts",
+    "predev": "tsx --env-file-if-exists=.env.local src/db/seed.ts --if-empty",
+    "db:migrate": "tsx --env-file-if-exists=.env.local src/db/migrate-cli.ts",
+    "db:export": "tsx --env-file-if-exists=.env.local scripts/db-export.ts",
+    "db:import": "tsx --env-file-if-exists=.env.local scripts/db-import.ts",
+    "db:verify": "tsx --env-file-if-exists=.env.local scripts/db-verify.ts",
+    "vercel-build": "tsx scripts/supabase-check.ts --build && tsx src/db/migrate-cli.ts --skip-if-unconfigured && tsx scripts/supabase-bootstrap.ts --skip-if-unconfigured && next build",
+    "supabase:bootstrap": "tsx --env-file-if-exists=.env.local scripts/supabase-bootstrap.ts",
+    "supabase:check": "tsx --env-file-if-exists=.env.local scripts/supabase-check.ts",
+    "user:role": "tsx --env-file-if-exists=.env.local scripts/user-role.ts",
+    "supabase:auth-config": "tsx scripts/supabase-auth-config.ts"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "0.5.8",
+    "@supabase/ssr": "0.12.7",
+    "@supabase/supabase-js": "2.117.1",
+    "@vercel/functions": "3.9.8",
+    "bcryptjs": "^3.0.3",
+    "clsx": "^2.1.1",
+    "drizzle-orm": "^0.45.4",
+    "lucide-react": "^1.53.0",
+    "next": "16.4.0",
+    "nodemailer": "10.0.10",
+    "pg": "8.23.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "server-only": "^0.0.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.0",
+    "@tailwindcss/turbopack": "^4",
+    "@types/node": "^22.20.5",
+    "@types/pg": "8.23.1",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "drizzle-kit": "^0.31.11",
+    "eslint": "^9",
+    "eslint-config-next": "16.4.0",
+    "tailwindcss": "^4",
+    "tsx": "^4.23.15",
+    "typescript": "^5",
+    "vitest": "^5.0.3"
+  },
+  "engines": {
+    "node": ">=22.12"
+  }
+}
