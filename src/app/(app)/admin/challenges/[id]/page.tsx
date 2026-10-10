@@ -112,7 +112,7 @@ export default async function ManageChallenge(props: PageProps<"/admin/challenge
       <Tabs active={tab} items={tabs} />
 
       {tab === "overview" && (
-        <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_340px]">
           <Card>
             <CardHeader title="Classificação provisória" subtitle={published ? "Resultados publicados" : "Visível apenas para si e para os avaliadores"} action={<ButtonLink href={`/admin/challenges/${id}?tab=submissions`} variant="ghost" size="sm">Todas</ButtonLink>} />
             {b.rows.length === 0 ? (
@@ -227,7 +227,7 @@ export default async function ManageChallenge(props: PageProps<"/admin/challenge
       {tab === "compare" && <Compare board={b} ids={compareIds} challengeId={id} />}
 
       {tab === "evaluators" && (
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <Card>
             <CardHeader title="Atribuídos" subtitle="Podem ver e avaliar todas as submissões deste desafio" />
             <ul className="divide-y divide-line/70">

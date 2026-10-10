@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { INVESTOR, loginAs, MEMBER } from "./helpers";
+import { INVESTOR, loginAs, MEMBER, publish } from "./helpers";
 
 const TITLE = `Desafio E2E ${Date.now().toString(36)}`;
 
@@ -92,15 +92,12 @@ test("validation errors keep the user's input", async ({ browser }) => {
 test("community: post, comment and react", async ({ browser }) => {
   const mem = await loginAs(browser, MEMBER);
   await mem.goto("/community");
-  await mem.getByRole("button", { name: /Partilhe uma pergunta/ }).click();
-  await mem.locator('input[name="title"]').fill("Pergunta de teste E2E");
-  await mem.locator('textarea[name="body"]').fill("Alguém tem experiência com tarifas bi-horárias?");
-  await mem.getByRole("button", { name: "Publicar" }).click();
-  await mem.getByRole("link", { name: "Pergunta de teste E2E" }).click();
-  await mem.locator('textarea[name="body"]').fill("Comentário de teste.");
+  await publish(mem, { kind: "Pergunta", title: "Pergunta de teste E2E", body: "Alguém tem experiência com tarifas bi-horárias?" });
+  await mem.getByRole("link", { name: "Pergunta de teste E2E" }).first().click();
+  await expect(mem).toHaveURL(/\/community\//);
+  await mem.getByLabel("Escrever um comentário").fill("Comentário de teste.");
   await mem.getByRole("button", { name: "Comentar" }).click();
-  await expect(mem.getByText("1 comentário")).toBeVisible();
-  const react = mem.getByRole("button", { name: /^0$/ }).or(mem.locator('button[aria-pressed="false"]')).first();
-  await react.click();
+  await expect(mem.getByRole("heading", { name: "1 comentário" })).toBeVisible();
+  await mem.getByRole("button", { name: "Gosto" }).click();
   await expect(mem.locator('button[aria-pressed="true"]')).toBeVisible();
 });

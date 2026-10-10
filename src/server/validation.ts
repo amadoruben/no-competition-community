@@ -13,11 +13,12 @@ export function parse<T extends z.ZodType>(schema: T, input: unknown): z.infer<T
   throw invalid("Reveja os campos assinalados.", fieldErrors);
 }
 
+/** Links shown to other people: web addresses only (no javascript:, data:, vbscript: or other schemes). */
 export const optionalUrl = z
   .string()
   .trim()
   .transform((v) => (v === "" ? null : v))
-  .pipe(z.url({ message: "Indique um URL válido (https://…)." }).nullable());
+  .pipe(z.url({ protocol: /^https?$/, message: "Indique um endereço web válido (https://…)." }).nullable());
 
 export const text = (min: number, max: number, label: string) =>
   z

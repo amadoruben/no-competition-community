@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, lte, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import {
@@ -414,4 +414,28 @@ export async function publicOverview() {
       .map((c) => ({ ...c, phase: challengePhase(c), topPrize: prizeRows.find((x) => x.challengeId === c.id) ?? null })),
     stats: { challenges: open.length, projects: p.n, members: m.n, submissions: s.n },
   };
+}
+
+/** Podiums of challenges whose results are published (never before: evaluations stay confidential). */
+export async function recentWinners(limit = 6) {
+  return db
+    .select({
+      challengeTitle: challenges.title,
+      challengeSlug: challenges.slug,
+      publishedAt: challenges.resultsPublishedAt,
+      rank: results.rank,
+      projectName: projects.name,
+      projectSlug: projects.slug,
+      logoHue: projects.logoHue,
+      logoFileId: projects.logoFileId,
+      prize: prizes.title,
+    })
+    .from(results)
+    .innerJoin(challenges, eq(challenges.id, results.challengeId))
+    .innerJoin(submissions, eq(submissions.id, results.submissionId))
+    .innerJoin(projects, eq(projects.id, submissions.projectId))
+    .leftJoin(prizes, eq(prizes.id, results.prizeId))
+    .where(and(isNotNull(challenges.resultsPublishedAt), lte(results.rank, 3)))
+    .orderBy(desc(challenges.resultsPublishedAt), asc(results.rank))
+    .limit(limit);
 }

@@ -61,7 +61,7 @@ const memberLedger = cache(async () => {
   const [facts, people] = await Promise.all([
     loadFacts(),
     db
-      .select({ id: users.id, name: users.name, handle: users.handle, headline: users.headline, avatarHue: users.avatarHue })
+      .select({ id: users.id, name: users.name, handle: users.handle, headline: users.headline, avatarHue: users.avatarHue, avatarFileId: users.avatarFileId })
       .from(users)
       .where(eq(users.role, "member")),
   ]);
@@ -76,6 +76,7 @@ export interface LeaderboardRow extends Standing {
   handle: string;
   headline: string;
   avatarHue: number;
+  avatarFileId: string | null;
 }
 
 export async function leaderboard(view: LeaderboardView, limit = 50): Promise<LeaderboardRow[]> {
@@ -86,7 +87,7 @@ export async function leaderboard(view: LeaderboardView, limit = 50): Promise<Le
       : standings(ledger, { sortBy: view === "overall" ? "total" : view });
   return rows.slice(0, limit).map((r) => {
     const u = people.get(r.userId)!;
-    return { ...r, name: u.name, handle: u.handle, headline: u.headline, avatarHue: u.avatarHue };
+    return { ...r, name: u.name, handle: u.handle, headline: u.headline, avatarHue: u.avatarHue, avatarFileId: u.avatarFileId };
   });
 }
 

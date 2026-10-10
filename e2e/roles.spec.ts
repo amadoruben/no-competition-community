@@ -17,7 +17,7 @@ test("evaluator: sees only assigned work, scores it, cannot reach investor areas
   // Colleagues' evaluations are never shown to an evaluator.
   await expect(ev.getByText("Todas as avaliações")).toHaveCount(0);
 
-  for (const path of ["/admin", "/admin/opportunities", "/admin/challenges/new"]) {
+  for (const path of ["/admin", "/admin/opportunities", "/admin/challenges/new", "/admin/videos", "/admin/people"]) {
     await ev.goto(path);
     await expect(ev).toHaveURL(/\/review$/);
   }
@@ -37,6 +37,12 @@ test("member: no access to evaluation or investor pages", async ({ browser }) =>
   await expect(mem).toHaveURL(/\/dashboard/);
   await mem.goto("/review");
   await expect(mem).toHaveURL(/\/dashboard/);
+  for (const path of ["/admin/videos", "/admin/people", "/admin/challenges/new"]) {
+    await mem.goto(path);
+    await expect(mem).toHaveURL(/\/dashboard/);
+  }
+  // No management entry points in a member's navigation.
+  await expect(mem.getByRole("navigation", { name: "Principal" }).getByRole("link", { name: /Gerir vídeos|Membros e acessos|Pipeline/ })).toHaveCount(0);
 });
 
 test("signed-out visitors are sent to login; files require a session", async ({ page, request }) => {

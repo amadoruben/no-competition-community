@@ -1,4 +1,4 @@
-import type { OpportunityStatus, PostKind, PrizeKind, ProjectStage, Role, SubmissionStatus } from "@/db/schema";
+import type { AccessTier, OpportunityStatus, PostKind, PrizeKind, ProjectStage, Role, SubmissionStatus } from "@/db/schema";
 import type { ChallengePhase } from "./challenge-state";
 import type { Tone } from "@/components/ui";
 
@@ -8,6 +8,11 @@ export const STAGE_LABEL: Record<ProjectStage, string> = {
   mvp: "MVP",
   traction: "Tracção",
   scaling: "Escala",
+};
+
+export const ACCESS_LABEL: Record<AccessTier, string> = {
+  free: "Acesso livre",
+  full: "Acesso completo",
 };
 
 export const ROLE_LABEL: Record<Role, string> = {

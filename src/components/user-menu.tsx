@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, Settings, UserRound } from "lucide-react";
+import { Compass, LogOut, Settings, UserRound, Wrench } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { logoutAction } from "@/app/actions";
@@ -13,6 +13,8 @@ export function UserMenu({
   fileId,
   roleLabel,
   placement = "down",
+  tools = [],
+  demo,
 }: {
   name: string;
   handle: string;
@@ -21,6 +23,9 @@ export function UserMenu({
   roleLabel: string;
   /** "up": full-width block at the bottom of the sidebar, menu opens above it. */
   placement?: "down" | "up";
+  /** Role tools (admin or evaluation), listed in the menu so phones reach them too. */
+  tools?: { href: string; label: string }[];
+  demo?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -77,6 +82,23 @@ export function UserMenu({
           <Link role="menuitem" href="/settings" onClick={() => setOpen(false)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-sunken">
             <Settings className="size-4 text-muted" /> Editar perfil
           </Link>
+          {tools.length > 0 && (
+            <>
+              <div className="my-1 h-px bg-line" />
+              <div className="px-3 pt-1.5 pb-1 text-[11px] font-semibold tracking-wider text-muted uppercase">{tools.length > 1 ? "Administração" : "Trabalho"}</div>
+              {tools.map((t) => (
+                <Link key={t.href} role="menuitem" href={t.href} onClick={() => setOpen(false)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-sunken">
+                  <Wrench className="size-4 text-muted" /> {t.label}
+                </Link>
+              ))}
+            </>
+          )}
+          {demo && (
+            <Link role="menuitem" href="/demo" onClick={() => setOpen(false)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm hover:bg-sunken sm:hidden">
+              <Compass className="size-4 text-muted" /> Visita guiada (demonstração)
+            </Link>
+          )}
+          <div className="my-1 h-px bg-line" />
           <form action={logoutAction}>
             <button role="menuitem" className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-bad hover:bg-bad-soft">
               <LogOut className="size-4" /> Terminar sessão

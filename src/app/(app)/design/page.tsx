@@ -172,11 +172,13 @@ export default async function DesignPage() {
               <ProjectLogo name="Voltaica" hue={85} /><ProjectLogo name="Balcão" hue={260} size={56} />
             </div>
           </Card>
-          <ChallengeCover hue={200} className="flex min-h-48 flex-col justify-between rounded-[20px] p-6 text-white">
-            <div className="flex gap-2"><span className="rounded-full bg-white/15 px-2.5 py-1 text-[12px]">Fintech</span><PhaseBadge phase="open" /></div>
-            <div>
-              <div className="font-display text-2xl font-semibold">Capa gerada a partir de um matiz</div>
-              <div className="mt-1 flex items-center gap-3 text-sm text-white/80"><Zap className="size-4" /> Sem imagens de banco · <Rocket className="size-4" /> consistente</div>
+          <ChallengeCover hue={200} seed="design" theme="Fintech finanças" className="min-h-48 rounded-[20px] text-white">
+            <div className="flex h-full min-h-48 flex-col justify-between p-6">
+              <div className="flex gap-2"><span className="rounded-full bg-white/15 px-2.5 py-1 text-[12px]">Fintech</span><PhaseBadge phase="open" /></div>
+              <div>
+                <div className="font-display text-2xl font-semibold">Capa gerada a partir de um matiz e do tema</div>
+                <div className="mt-1 flex items-center gap-3 text-sm text-white/80"><Zap className="size-4" /> Sem imagens de banco · <Rocket className="size-4" /> consistente</div>
+              </div>
             </div>
           </ChallengeCover>
         </div>

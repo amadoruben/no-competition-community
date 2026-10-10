@@ -1,160 +1,116 @@
 "use client";
 
 import clsx from "clsx";
-import {
-  BookOpen,
-  BriefcaseBusiness,
-  ClipboardCheck,
-  Gauge,
-  LayoutDashboard,
-  Menu,
-  MessagesSquare,
-  Plus,
-  Rocket,
-  Trophy,
-  UserCog,
-  Users,
-  Zap,
-  type LucideIcon,
-} from "lucide-react";
+import { ClipboardCheck, Gauge } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, type ReactNode } from "react";
 import type { Role } from "@/db/schema";
-import { Drawer } from "./overlay";
+import { mainItems, toolsFor } from "@/lib/nav";
 
-type Item = { href: string; label: string; icon: LucideIcon; match?: (path: string) => boolean };
-type Group = { title: string; items: Item[] };
-
-const under = (...prefixes: string[]) => (p: string) => prefixes.some((x) => p === x || p.startsWith(x + "/"));
-
-const EXPLORE: Group = {
-  title: "Explorar",
-  items: [
-    { href: "/challenges", label: "Desafios", icon: Zap },
-    { href: "/projects", label: "Projectos", icon: Rocket },
-    { href: "/members", label: "Membros", icon: Users },
-    { href: "/leaderboard", label: "Classificações", icon: Trophy },
-  ],
-};
-const COMMUNITY: Group = {
-  title: "Comunidade",
-  items: [
-    { href: "/community", label: "Publicações", icon: MessagesSquare },
-    { href: "/learn", label: "Aprender", icon: BookOpen },
-  ],
-};
-
-/** Navigation by role: what the person manages first, then what everyone shares. */
-export function navFor(role: Role): Group[] {
-  if (role === "investor")
-    return [
-      {
-        title: "Gestão",
-        items: [
-          { href: "/admin", label: "Painel", icon: Gauge, match: (p) => p === "/admin" || under("/admin/challenges")(p) },
-          { href: "/admin/opportunities", label: "Pipeline de investimento", icon: BriefcaseBusiness },
-          { href: "/admin/people", label: "Membros e papéis", icon: UserCog },
-        ],
-      },
-      EXPLORE,
-      COMMUNITY,
-    ];
-  if (role === "evaluator")
-    return [{ title: "Trabalho", items: [{ href: "/review", label: "Avaliações", icon: ClipboardCheck, match: under("/review", "/evaluate") }] }, EXPLORE, COMMUNITY];
-  return [{ title: "O meu espaço", items: [{ href: "/dashboard", label: "Início", icon: LayoutDashboard }] }, EXPLORE, COMMUNITY];
-}
-
-const QUICK: Partial<Record<Role, { href: string; label: string }>> = {
-  investor: { href: "/admin/challenges/new", label: "Novo desafio" },
-  member: { href: "/projects/new", label: "Novo projecto" },
-};
-
-const isActive = (path: string, item: Item) => (item.match ?? under(item.href))(path);
-
-function NavList({ role, onNavigate }: { role: Role; onNavigate?: () => void }) {
+/** Desktop: the five areas as tabs in the header. */
+export function TopNav({ handle }: { handle: string }) {
   const pathname = usePathname();
-  const quick = QUICK[role];
   return (
-    <nav aria-label="Principal" className="space-y-6">
-      {quick && (
-        <Link
-          href={quick.href}
-          onClick={onNavigate}
-          className="flex h-10 items-center justify-center gap-2 rounded-xl bg-volt text-sm font-semibold text-ink ring-1 ring-volt-strong/60 transition-colors hover:bg-volt-strong"
-        >
-          <Plus className="size-4" strokeWidth={2.5} /> {quick.label}
-        </Link>
-      )}
-      {navFor(role).map((g) => (
-        <div key={g.title}>
-          <p className="mb-1.5 px-3 text-[11px] font-semibold tracking-wider text-muted uppercase">{g.title}</p>
-          <ul className="space-y-0.5">
-            {g.items.map((item) => {
-              const active = isActive(pathname, item);
-              const Icon = item.icon;
-              return (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    onClick={onNavigate}
-                    aria-current={active ? "page" : undefined}
-                    className={clsx(
-                      "flex h-9 items-center gap-2.5 rounded-lg px-3 text-[14px] font-medium transition-colors",
-                      active ? "bg-ink text-white" : "text-ink-2 hover:bg-sunken hover:text-ink",
-                    )}
-                  >
-                    <Icon className="size-[17px] shrink-0" strokeWidth={active ? 2.3 : 1.9} />
-                    <span className="truncate">{item.label}</span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      ))}
+    <nav aria-label="Principal" className="hidden h-full lg:block">
+      <ul className="flex h-full items-stretch gap-1">
+        {mainItems(handle).map((item) => {
+          const active = item.match(pathname);
+          const Icon = item.icon;
+          return (
+            <li key={item.href} className="flex">
+              <Link
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+                className={clsx(
+                  "relative flex items-center gap-2 rounded-md px-3 text-[14px] font-medium transition-colors",
+                  "after:absolute after:inset-x-3 after:bottom-0 after:h-[3px] after:rounded-full after:transition-colors",
+                  active ? "text-ink after:bg-ink" : "text-muted after:bg-transparent hover:text-ink",
+                )}
+              >
+                <Icon className="size-[18px]" strokeWidth={active ? 2.3 : 1.9} />
+                {item.label}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
     </nav>
   );
 }
 
-/** Sidebar from lg up: the column spans the page, its content stays in view. `footer` holds the account block. */
-export function Sidebar({ role, brand, footer }: { role: Role; brand: ReactNode; footer: ReactNode }) {
+/** Desktop: one entry point to the role's tools (admin or evaluation), next to the account menu. */
+export function ToolsLink({ role }: { role: Role }) {
+  const pathname = usePathname();
+  const tools = toolsFor(role);
+  if (!tools.length) return null;
+  const active = tools.some((t) => t.match(pathname));
+  const label = role === "investor" ? "Administração" : "Avaliações";
+  const Icon = role === "investor" ? Gauge : ClipboardCheck;
   return (
-    <aside className="hidden w-[264px] shrink-0 border-r border-line bg-surface lg:block">
-      <div className="sticky top-0 flex h-dvh flex-col">
-        <div className="flex h-16 items-center px-5">{brand}</div>
-        <div className="scrollbar-none flex-1 overflow-y-auto px-3 pt-2 pb-6">
-          <NavList role={role} />
-        </div>
-        <div className="border-t border-line p-3">{footer}</div>
-      </div>
-    </aside>
+    <Link
+      href={tools[0].href}
+      aria-current={active ? "page" : undefined}
+      className={clsx(
+        "hidden h-9 items-center gap-2 rounded-full px-3.5 text-[13px] font-medium ring-1 transition-colors ring-inset lg:inline-flex",
+        active ? "bg-ink text-white ring-ink" : "bg-surface text-ink ring-line-strong hover:bg-sunken",
+      )}
+    >
+      <Icon className="size-4" /> {label}
+    </Link>
   );
 }
 
-/** Below lg: top bar with a menu button opening the same navigation in a drawer. */
-export function MobileNav({ role, brand, footer }: { role: Role; brand: ReactNode; footer: ReactNode }) {
-  const [open, setOpen] = useState(false);
+/** Tabs inside the admin area (Administração). */
+export function AdminNav() {
+  const pathname = usePathname();
   return (
-    <div className="sticky top-0 z-40 flex h-14 items-center justify-between gap-3 border-b border-line bg-paper/90 px-4 backdrop-blur lg:hidden">
-      {brand}
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-label="Abrir menu"
-        aria-expanded={open}
-        className="grid size-10 place-items-center rounded-full ring-1 ring-line hover:bg-sunken"
-      >
-        <Menu className="size-5" />
-      </button>
-      <Drawer open={open} onClose={() => setOpen(false)} title="Menu">
-        <div className="flex h-full flex-col">
-          <div className="flex-1 overflow-y-auto p-3">
-            <NavList role={role} onNavigate={() => setOpen(false)} />
-          </div>
-          <div className="border-t border-line p-3">{footer}</div>
-        </div>
-      </Drawer>
-    </div>
+    <nav aria-label="Administração" className="scrollbar-none -mx-4 mb-6 flex gap-1 overflow-x-auto border-b border-line px-4 sm:mx-0 sm:px-0">
+      {toolsFor("investor").map((t) => {
+        const active = t.match(pathname);
+        const Icon = t.icon;
+        return (
+          <Link
+            key={t.href}
+            href={t.href}
+            aria-current={active ? "page" : undefined}
+            className={clsx(
+              "-mb-px flex h-11 items-center gap-2 border-b-2 px-3 text-sm font-medium whitespace-nowrap transition-colors",
+              active ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink",
+            )}
+          >
+            <Icon className="size-4" /> {t.label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
+/** Phones and tablets: the five areas in a bottom bar, within thumb reach. */
+export function MobileTabs({ handle }: { handle: string }) {
+  const pathname = usePathname();
+  return (
+    <nav aria-label="Secções" className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
+      <ul className="mx-auto grid max-w-lg grid-cols-5">
+        {mainItems(handle).map((item) => {
+          const active = item.match(pathname);
+          const Icon = item.icon;
+          return (
+            <li key={item.href}>
+              <Link
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+                className={clsx("flex h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium", active ? "text-ink" : "text-muted")}
+              >
+                <span className={clsx("grid h-7 w-12 place-items-center rounded-full transition-colors", active && "bg-volt")}>
+                  <Icon className="size-[19px]" strokeWidth={active ? 2.4 : 1.9} />
+                </span>
+                {item.label}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
   );
 }

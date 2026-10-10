@@ -174,6 +174,15 @@ export function analyseSupabaseEnv(env: Env): { ref: string | null; findings: Fi
   else if (!ref) add("error", "NEXT_PUBLIC_SUPABASE_URL should look like https://<20-character ref>.supabase.co");
   else add("ok", `Project ref from NEXT_PUBLIC_SUPABASE_URL: ${ref}`);
 
+  // Preview and Production must not share a database. PRODUCTION_SUPABASE_REF names
+  // the Production project; a Preview build pointing at it fails instead of writing
+  // test data into real data.
+  const prodRef = clean(env.PRODUCTION_SUPABASE_REF);
+  if (prodRef && ref && env.VERCEL_ENV === "preview") {
+    if (ref === prodRef) add("error", `This Preview deployment uses the Production Supabase project (${ref}). Give Preview its own project: docs/PREVIEW-DATABASE.md.`);
+    else add("ok", `Preview uses its own Supabase project (${ref}), not Production (${prodRef})`);
+  }
+
   for (const name of ["AUTH_PROVIDER", "STORAGE_PROVIDER"] as const) {
     if (env[name] !== "supabase") add("warn", `${name} is "${env[name] ?? "local"}"; set it to "supabase" to use the Supabase project.`);
   }

@@ -1,7 +1,7 @@
 import { and, asc, eq, ilike, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { users, type User } from "@/db/schema";
-import { ROLE_LABEL } from "@/lib/labels";
+import { ACCESS_TIERS, users, type User } from "@/db/schema";
+import { ACCESS_LABEL, ROLE_LABEL } from "@/lib/labels";
 import { forbidden, invalid, notFound } from "./errors";
 import { logDecision } from "./log";
 import { assertInvestor } from "./permissions";
@@ -17,7 +17,7 @@ export async function listPeople(actor: User, opts: { q?: string } = {}) {
   const scope = eq(users.isDemo, actor.isDemo);
   const [rows, totals] = await Promise.all([
     db
-      .select({ id: users.id, name: users.name, email: users.email, handle: users.handle, role: users.role, avatarHue: users.avatarHue, avatarFileId: users.avatarFileId, createdAt: users.createdAt })
+      .select({ id: users.id, name: users.name, email: users.email, handle: users.handle, role: users.role, accessTier: users.accessTier, avatarHue: users.avatarHue, avatarFileId: users.avatarFileId, createdAt: users.createdAt })
       .from(users)
       .where(q ? and(scope, or(ilike(users.name, `%${q}%`), ilike(users.email, `%${q}%`))) : scope)
       .orderBy(sql`case ${users.role} when 'investor' then 0 when 'evaluator' then 1 else 2 end`, asc(users.name)),
@@ -40,6 +40,20 @@ export async function changeRole(actor: User, userId: string, role: string) {
   return db.transaction(async (tx) => {
     const [u] = await tx.update(users).set({ role: role as AssignableRole }).where(eq(users.id, userId)).returning();
     await logDecision({ actorId: actor.id, action: "role_changed", summary: `${u.name} passou a ${ROLE_LABEL[u.role].toLowerCase()}.` }, tx);
+    return u;
+  });
+}
+
+/** Grant or remove full access to exclusive content. Manual until payments exist; logged. */
+export async function setAccessTier(actor: User, userId: string, tier: string) {
+  assertInvestor(actor);
+  if (!(ACCESS_TIERS as readonly string[]).includes(tier)) throw invalid("Acesso inválido.");
+  const [target] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (!target || target.isDemo !== actor.isDemo) throw notFound("Membro não encontrado.");
+  if (target.accessTier === tier) return target;
+  return db.transaction(async (tx) => {
+    const [u] = await tx.update(users).set({ accessTier: tier as User["accessTier"] }).where(eq(users.id, userId)).returning();
+    await logDecision({ actorId: actor.id, action: "access_changed", summary: `${u.name}: ${ACCESS_LABEL[u.accessTier].toLowerCase()}.` }, tx);
     return u;
   });
 }

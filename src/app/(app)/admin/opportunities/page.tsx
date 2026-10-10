@@ -26,7 +26,7 @@ export default async function OpportunitiesPage(props: PageProps<"/admin/opportu
       <Link href="/admin" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-ink"><ArrowLeft className="size-4" /> Painel</Link>
       <PageHeader title="Pipeline de investimento" description="Separado dos resultados dos desafios: vencer não implica financiamento, e qualquer projecto pode entrar no pipeline." />
       <Notice tone="info">Registo de decisões apenas. A plataforma não processa pagamentos, transferências nem contratos.</Notice>
-      <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_340px]">
         <div className="scrollbar-none -mx-4 flex gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0">
           {OPPORTUNITY_STATUSES.map((st) => {
             const col = opps.filter((o) => o.o.status === st);

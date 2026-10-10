@@ -1,51 +1,57 @@
 import { ArrowLeft } from "lucide-react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { PostCard, RoleTag } from "@/components/domain";
-import { Avatar, Card } from "@/components/ui";
+import { CommentThread } from "@/components/feed/comment-thread";
+import { PostCard } from "@/components/feed/post-card";
 import { timeAgo } from "@/lib/format";
 import { getPost } from "@/server/community";
 import { DomainError } from "@/server/errors";
 import { requireUser } from "@/server/session";
-import { CommentForm } from "./comment-form";
 
-export default async function PostPage(props: PageProps<"/community/[id]">) {
+async function load(id: string) {
   const user = await requireUser();
-  const { id } = await props.params;
-  let post;
   try {
-    post = await getPost(user, id);
+    return { user, post: await getPost(user, id) };
   } catch (e) {
     if (e instanceof DomainError) notFound();
     throw e;
   }
+}
+
+export async function generateMetadata(props: PageProps<"/community/[id]">): Promise<Metadata> {
+  const { post } = await load((await props.params).id);
+  const text = post.post.title || post.post.body;
+  return { title: text ? (text.length > 60 ? `${text.slice(0, 58)}…` : text) : `Publicação de ${post.authorName}` };
+}
+
+/** One post with its full text, photos or video, and the whole conversation with replies. */
+export default async function PostPage(props: PageProps<"/community/[id]">) {
+  const { user, post } = await load((await props.params).id);
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
-      <Link href="/community" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-ink">
-        <ArrowLeft className="size-4" /> Comunidade
+    <div className="mx-auto max-w-[680px] space-y-2 sm:space-y-4">
+      <Link href="/dashboard" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-ink">
+        <ArrowLeft className="size-4" /> Início
       </Link>
-      <PostCard item={post} full />
-      <Card className="p-4 sm:p-5">
-        <h2 className="mb-4 text-sm font-semibold">{post.comments.length} {post.comments.length === 1 ? "comentário" : "comentários"}</h2>
-        <ul className="space-y-5">
-          {post.comments.map((c) => (
-            <li key={c.c.id} className="flex gap-3">
-              <Avatar name={c.authorName} hue={c.authorHue} size={32} />
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2 text-[13px]">
-                  <Link href={`/members/${c.authorHandle}`} className="font-medium hover:underline">{c.authorName}</Link>
-                  <RoleTag role={c.authorRole} />
-                  <span className="text-muted">{timeAgo(c.c.createdAt)}</span>
-                </div>
-                <p className="mt-1 text-[14px] whitespace-pre-line text-ink-2">{c.c.body}</p>
-              </div>
-            </li>
-          ))}
-        </ul>
-        <div className="mt-6 border-t border-line pt-5">
-          <CommentForm postId={post.post.id} />
-        </div>
-      </Card>
+      <PostCard item={post} full viewer={{ id: user.id, role: user.role }} />
+      <CommentThread
+        postId={post.post.id}
+        viewer={{ id: user.id, role: user.role }}
+        me={{ name: user.name, hue: user.avatarHue, fileId: user.avatarFileId }}
+        comments={post.comments.map((c) => ({
+          id: c.c.id,
+          parentId: c.c.parentId,
+          body: c.c.body,
+          authorId: c.c.authorId,
+          authorName: c.authorName,
+          authorHandle: c.authorHandle,
+          authorHue: c.authorHue,
+          authorAvatar: c.authorAvatar,
+          authorRole: c.authorRole,
+          when: timeAgo(c.c.createdAt),
+          at: c.c.createdAt.toISOString(),
+        }))}
+      />
     </div>
   );
 }

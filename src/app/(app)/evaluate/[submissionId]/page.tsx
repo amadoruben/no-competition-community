@@ -40,7 +40,7 @@ export default async function EvaluatePage(props: PageProps<"/evaluate/[submissi
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_400px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_400px]">
         <div className="min-w-0 space-y-4">
           <Card className="p-5 sm:p-6">
             <div className="flex items-start gap-4">

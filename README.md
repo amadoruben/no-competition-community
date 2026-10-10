@@ -1,9 +1,24 @@
 # No Competition Community
 
-Plataforma onde um investidor lança desafios, os membros constroem e submetem projectos, avaliadores pontuam com critérios públicos e os resultados são publicados com histórico de decisões. Prémios e investimento são registos separados.
+A comunidade oficial da marca No Competition: os seguidores tornam-se membros activos através de conteúdos exclusivos, conversas e desafios com prémios. Projectos, avaliações e o pipeline de investimento continuam a existir, em segundo plano.
+
+**Experiência dos membros — cinco áreas:**
+
+| Área | Rota | Assenta em |
+|---|---|---|
+| Início | `/dashboard` | `posts`, `comments`, `reactions` (feed; anúncios oficiais fixados; `/community` redirecciona) |
+| Vídeos | `/videos` | `courses` (colecções), `modules` (secções), `lessons` (+ `video_url`), `lesson_progress` |
+| Desafios | `/challenges` | `challenges`, `participations`, `submissions`, `results` (vencedores só após publicação) |
+| Membros | `/members` (+ Classificação, Projectos) | `users` (perfil público), pontos, `projects` |
+| Perfil | `/profile` → `/members/<handle>` | actividade, conquistas, estado da conta, `/settings` |
+
+**Administração** (papel `investor` = equipa No Competition), num grupo à parte da navegação: painel e desafios, **Gerir vídeos** (`/admin/videos`), **Membros e acessos** (`/admin/people`: avaliadores e acesso completo), pipeline de investimento.
+
+**Acesso a conteúdos:** cada colecção de vídeos declara `access_tier` (`free` = todos os membros; `full` = só membros com acesso completo). O acesso completo de cada membro (`users.access_tier`) é atribuído à mão pela administração — **não existem pagamentos**: nada é cobrado nem apresentado como pago. Conteúdo restrito nunca envia o link do vídeo nem as notas ao browser (verificado em `src/server/__tests__/videos.test.ts` e `e2e/community.spec.ts`). Um sistema de pagamentos futuro só precisa de alterar `users.access_tier`.
 
 > Os dados de demonstração são **fictícios**.
 
+- **Lançamento (o que falta, por ordem):** [`docs/LAUNCH.md`](docs/LAUNCH.md) · base exclusiva da Preview: [`docs/PREVIEW-DATABASE.md`](docs/PREVIEW-DATABASE.md)
 - Arquitectura e versões: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - **Ligar ao Supabase (passo a passo):** [`docs/SUPABASE-SETUP.md`](docs/SUPABASE-SETUP.md)
 - Deploy, backups, monitorização, email (SMTP), **diagnóstico** e mudança de fornecedor: [`docs/OPERATIONS.md`](docs/OPERATIONS.md)

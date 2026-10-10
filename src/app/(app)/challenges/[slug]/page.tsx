@@ -35,7 +35,6 @@ export default async function ChallengePage(props: PageProps<"/challenges/[slug]
   const c = d.challenge;
   const tab = typeof sp.tab === "string" ? sp.tab : "overview";
   const totalWeight = d.criteria.reduce((s, x) => s + x.weight, 0);
-  const topPrize = d.prizes[0];
   const myResult = d.viewerSubmission && d.resultsPublished ? d.results.find((r) => r.projectSlug === d.viewerSubmission!.projectSlug) : undefined;
   const feedback = d.viewerSubmission && d.resultsPublished ? await feedbackForTeam(user, d.viewerSubmission.s.id) : [];
 
@@ -54,30 +53,9 @@ export default async function ChallengePage(props: PageProps<"/challenges/[slug]
       {sp.submitted && <Notice tone="ok">Submissão entregue. Pode editá-la até ao fim do prazo.</Notice>}
       {sp.updated && <Notice tone="ok">Submissão actualizada.</Notice>}
 
-      <ChallengeCover hue={c.coverHue} className="rounded-[20px] px-5 py-6 text-white sm:px-8 sm:py-9">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-full bg-white/15 px-2.5 py-1 text-[12px] font-medium">{c.category}</span>
-          <PhaseBadge phase={d.phase} />
-        </div>
-        <h1 className="mt-4 max-w-3xl font-display text-[30px] leading-[1.1] font-semibold sm:text-[44px]">{c.title}</h1>
-        <p className="mt-3 max-w-2xl text-[16px] text-white/80">{c.tagline}</p>
-        <dl className="mt-7 grid max-w-3xl grid-cols-2 gap-4 sm:grid-cols-4">
-          {[
-            ["Prazo", fmtDate(c.submissionDeadline), phaseTimeline(c, d.phase)],
-            ["Prémio principal", topPrize?.value || "—", topPrize?.title],
-            ["Participantes", d.participantCount, d.submissionCount === 1 ? "1 submissão" : `${d.submissionCount} submissões`],
-            ["Equipas até", `${c.maxTeamSize} pessoas`, null],
-          ].map(([k, v, h]) => (
-            <div key={k as string}>
-              <dt className="text-[12px] text-white/60">{k}</dt>
-              <dd className="tabular font-display text-xl font-semibold">{v}</dd>
-              {h && <dd className="text-[12px] text-white/70">{h}</dd>}
-            </div>
-          ))}
-        </dl>
-      </ChallengeCover>
+      <ChallengeHero d={d} />
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0">
           <Tabs active={tab} items={tabs} />
           <div className="mt-6 space-y-6">
@@ -149,7 +127,7 @@ export default async function ChallengePage(props: PageProps<"/challenges/[slug]
                   </Card>
                 ))}
                 <p className="text-[13px] text-muted">
-                  Vencer um desafio dá direito ao prémio indicado. Oportunidades de investimento são processos separados, sujeitos a due diligence.
+                  Os prémios são atribuídos de acordo com as regras deste desafio e com os resultados publicados pela No Competition; nenhuma participação garante um prémio. Oportunidades de investimento são processos separados, sujeitos a análise própria.
                 </p>
               </div>
             )}
@@ -206,7 +184,7 @@ export default async function ChallengePage(props: PageProps<"/challenges/[slug]
           </div>
         </div>
 
-        <aside className="space-y-4 lg:sticky lg:top-32 lg:self-start">
+        <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
           <Card className="p-5">
             <ParticipationPanel d={d} slug={slug} myRank={myResult?.rank} feedback={feedback.map((f) => f.feedback)} role={user.role} />
           </Card>
@@ -237,6 +215,46 @@ export default async function ChallengePage(props: PageProps<"/challenges/[slug]
         </aside>
       </div>
     </div>
+  );
+}
+
+function ChallengeHero({ d }: { d: ChallengeDetail }) {
+  const c = d.challenge;
+  const base = `hsl(${c.coverHue} 34% 14%)`;
+  const topPrize = d.prizes[0];
+  const facts: { label: string; value: React.ReactNode; hint?: string | null }[] = [
+    { label: "Prazo de submissão", value: fmtDate(c.submissionDeadline), hint: phaseTimeline(c, d.phase) },
+    ...(topPrize?.value ? [{ label: topPrize.title || "Prémio principal", value: topPrize.value, hint: d.prizes.length > 1 ? `+ ${d.prizes.length - 1} ${d.prizes.length === 2 ? "prémio" : "prémios"}` : null }] : []),
+    { label: "Inscritos", value: d.participantCount, hint: d.submissionCount > 0 ? (d.submissionCount === 1 ? "1 submissão" : `${d.submissionCount} submissões`) : null },
+    { label: "Equipas", value: `até ${c.maxTeamSize}`, hint: c.maxTeamSize === 1 ? "pessoa" : "pessoas" },
+  ];
+  return (
+    <section aria-labelledby="challenge-title" className="overflow-hidden rounded-[22px] text-white" style={{ backgroundColor: base }}>
+      <div className="relative">
+        <div aria-hidden className="relative aspect-[2/1] sm:absolute sm:inset-y-0 sm:right-0 sm:aspect-auto sm:w-[48%]">
+          <ChallengeCover hue={c.coverHue} seed={c.slug} theme={`${c.category} ${c.title}`} className="size-full" />
+          <div className="absolute inset-0 sm:hidden" style={{ background: `linear-gradient(to top, ${base}, transparent 55%)` }} />
+          <div className="absolute inset-0 hidden sm:block" style={{ background: `linear-gradient(to right, ${base}, transparent 70%)` }} />
+        </div>
+        <div className="relative px-5 pb-6 sm:max-w-[62%] sm:px-8 sm:py-9">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-white/15 px-2.5 py-1 text-[12px] font-medium">{c.category}</span>
+            <PhaseBadge phase={d.phase} />
+          </div>
+          <h1 id="challenge-title" className="mt-4 font-display text-[28px] leading-[1.08] font-semibold sm:text-[40px]">{c.title}</h1>
+          <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-white/80 sm:text-[16px]">{c.tagline}</p>
+        </div>
+      </div>
+      <dl className="relative grid grid-cols-2 gap-x-4 gap-y-4 border-t border-white/10 bg-black/15 px-5 py-4 sm:grid-cols-4 sm:px-8">
+        {facts.map((f) => (
+          <div key={f.label} className="min-w-0">
+            <dt className="truncate text-[12px] text-white/60">{f.label}</dt>
+            <dd className="tabular truncate font-display text-[18px] font-semibold sm:text-xl">{f.value}</dd>
+            {f.hint && <dd className="truncate text-[12px] text-white/70">{f.hint}</dd>}
+          </div>
+        ))}
+      </dl>
+    </section>
   );
 }
 

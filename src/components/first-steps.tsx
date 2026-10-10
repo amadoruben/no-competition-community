@@ -5,10 +5,39 @@ import { Card, cx, Progress } from "./ui";
 export type Step = { done: boolean; title: string; detail: string; href: string; cta: string };
 
 /** "Primeiros passos": shown until every step is done, so an empty platform always says what to do next. */
-export function FirstSteps({ title = "Primeiros passos", steps }: { title?: string; steps: Step[] }) {
+export function FirstSteps({ title = "Primeiros passos", steps, compact }: { title?: string; steps: Step[]; compact?: boolean }) {
   const done = steps.filter((s) => s.done).length;
   if (done === steps.length) return null;
   const next = steps.findIndex((s) => !s.done);
+  if (compact)
+    return (
+      <Card className="overflow-hidden">
+        <div className="px-4 pt-4 pb-3">
+          <h2 className="font-display text-[16px] font-semibold">{title}</h2>
+          <div className="mt-2 flex items-center gap-3">
+            <Progress value={(done / steps.length) * 100} tone="volt" className="flex-1" />
+            <span className="tabular text-[12px] text-muted">{done}/{steps.length}</span>
+          </div>
+        </div>
+        <ol className="px-2 pb-2">
+          {steps.map((s, i) => (
+            <li key={s.title}>
+              <Link
+                href={s.href}
+                className={cx("group flex items-center gap-3 rounded-xl px-2 py-2", i === next ? "bg-volt-soft" : "hover:bg-sunken/70")}
+                aria-label={s.done ? `${s.title} (concluído)` : `${s.title}: ${s.cta}`}
+              >
+                <span className={cx("grid size-6 shrink-0 place-items-center rounded-full text-[11px] font-semibold", s.done ? "bg-ink text-volt" : i === next ? "bg-volt text-ink ring-1 ring-volt-strong" : "bg-sunken text-muted")}>
+                  {s.done ? <Check className="size-3.5" strokeWidth={3} /> : i + 1}
+                </span>
+                <span className={cx("min-w-0 flex-1 text-[13px] leading-snug", s.done ? "text-muted line-through" : "font-medium text-ink")}>{s.title}</span>
+                {!s.done && <ArrowRight className="size-3.5 shrink-0 text-muted transition-transform group-hover:translate-x-0.5" />}
+              </Link>
+            </li>
+          ))}
+        </ol>
+      </Card>
+    );
   return (
     <Card className="overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">

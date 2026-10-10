@@ -1,6 +1,7 @@
 import clsx from "clsx";
 import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
+import { CoverArt, glyphFor } from "./cover-art";
 
 export { clsx as cx };
 
@@ -57,7 +58,7 @@ export function CardHeader({ title, action, subtitle }: { title: ReactNode; acti
   return (
     <div className="flex items-start justify-between gap-4 border-b border-line/70 px-5 py-4">
       <div className="min-w-0">
-        <h2 className="text-[15px] font-semibold text-ink">{title}</h2>
+        <h2 className="font-display text-[16px] font-semibold text-ink">{title}</h2>
         {subtitle && <p className="mt-0.5 text-[13px] text-muted">{subtitle}</p>}
       </div>
       {action}
@@ -156,22 +157,41 @@ export function PageHeader({
   return (
     <div className="flex flex-col gap-4 pb-6 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0">
-        {eyebrow && <div className="mb-2 text-[13px] font-medium text-muted">{eyebrow}</div>}
-        <h1 className="font-display text-[28px] leading-tight font-semibold sm:text-[34px]">{title}</h1>
-        {description && <p className="mt-2 max-w-2xl text-[15px] text-ink-2">{description}</p>}
+        {eyebrow && <div className="mb-1.5 text-[12px] font-semibold tracking-[0.08em] text-muted uppercase">{eyebrow}</div>}
+        <h1 className="font-display text-[28px] leading-[1.1] font-semibold sm:text-[34px]">{title}</h1>
+        {description && <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-ink-2">{description}</p>}
       </div>
       {actions && <div className="flex shrink-0 flex-wrap gap-2">{actions}</div>}
     </div>
   );
 }
 
-export function EmptyState({ icon, title, children, action }: { icon?: ReactNode; title: string; children?: ReactNode; action?: ReactNode }) {
+/** Section title row used across pages: display face, optional action on the right. */
+export function SectionTitle({ title, action, subtitle, id }: { title: ReactNode; action?: ReactNode; subtitle?: ReactNode; id?: string }) {
   return (
-    <div className="flex flex-col items-center px-6 py-12 text-center">
-      {icon && <div className="mb-3 grid size-11 place-items-center rounded-full bg-sunken text-muted">{icon}</div>}
-      <p className="font-semibold text-ink">{title}</p>
-      {children && <p className="mt-1 max-w-sm text-sm text-muted">{children}</p>}
-      {action && <div className="mt-4">{action}</div>}
+    <div className="mb-3 flex items-end justify-between gap-4">
+      <div className="min-w-0">
+        <h2 id={id} className="font-display text-[20px] leading-tight font-semibold">{title}</h2>
+        {subtitle && <p className="mt-0.5 text-[13px] text-muted">{subtitle}</p>}
+      </div>
+      {action}
+    </div>
+  );
+}
+
+export function EmptyState({ icon, title, children, action, compact }: { icon?: ReactNode; title: string; children?: ReactNode; action?: ReactNode; compact?: boolean }) {
+  return (
+    <div className={clsx("flex flex-col items-center px-6 text-center", compact ? "py-8" : "py-14")}>
+      {icon && (
+        <div aria-hidden className="relative mb-4 grid size-14 place-items-center">
+          <span className="absolute inset-0 rounded-full ring-[3px] ring-volt-strong/60" />
+          <span className="absolute inset-[7px] rounded-full bg-volt-soft" />
+          <span className="relative text-ink [&_svg]:size-5">{icon}</span>
+        </div>
+      )}
+      <p className="font-display text-[17px] font-semibold text-ink">{title}</p>
+      {children && <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted">{children}</p>}
+      {action && <div className="mt-5">{action}</div>}
     </div>
   );
 }
@@ -254,12 +274,12 @@ export function Notice({ tone = "info", children, className }: { tone?: "info" |
   );
 }
 
-/** Generated cover art for a challenge, from its hue. */
-export function ChallengeCover({ hue, className, children }: { hue: number; className?: string; children?: ReactNode }) {
+/** Generated cover art for a challenge: its hue, its theme glyph (from category/title) and a stable composition. */
+export function ChallengeCover({ hue, seed, theme, className, children }: { hue: number; seed?: string; theme?: string; className?: string; children?: ReactNode }) {
   return (
-    <div className={clsx("cover relative overflow-hidden", className)} style={{ ["--h" as string]: hue }}>
+    <CoverArt hue={hue} seed={seed ?? String(hue)} glyph={glyphFor(theme)} className={className}>
       {children}
-    </div>
+    </CoverArt>
   );
 }
 

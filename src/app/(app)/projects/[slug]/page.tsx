@@ -73,7 +73,7 @@ export default async function ProjectPage(props: PageProps<"/projects/[slug]">) 
         </div>
       </Card>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
         <div className="min-w-0 space-y-6">
           {(p.problem || p.solution) && (
             <div className="grid gap-4 sm:grid-cols-2">

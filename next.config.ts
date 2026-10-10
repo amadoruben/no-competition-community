@@ -18,7 +18,8 @@ const nextConfig: NextConfig = {
   // Native/WASM database drivers stay out of the bundle.
   serverExternalPackages: ["@electric-sql/pglite", "postgres"],
   experimental: {
-    serverActions: { bodySizeLimit: "3mb" }, // 2 MB image uploads + form overhead
+    // A post carries up to 6 photos resized in the browser; Vercel caps request bodies at 4.5 MB.
+    serverActions: { bodySizeLimit: "4mb" },
   },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];

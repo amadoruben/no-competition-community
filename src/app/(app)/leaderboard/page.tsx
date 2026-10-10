@@ -2,6 +2,7 @@ import { Info, Trophy } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { RankMedal, ScorePill } from "@/components/domain";
+import { MembersSwitch } from "@/components/members-switch";
 import { Avatar, Card, CardHeader, cx, EmptyState, PageHeader, ProjectLogo, Tabs } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import { POINT_RULES } from "@/lib/points";
@@ -27,9 +28,10 @@ export default async function LeaderboardPage(props: PageProps<"/leaderboard">) 
 
   return (
     <div>
-      <PageHeader title="Classificações" description="Participação e mérito medidos em separado, com regras públicas. Popularidade não conta." />
+      <MembersSwitch active="leaderboard" />
+      <PageHeader title="Classificação" description="Participação e mérito medidos em separado, com regras públicas. Popularidade não conta." />
       <Tabs active={view.key} items={tabs} />
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_320px]">
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0">{view.key === "challenge" ? <ByChallenge user={user} selected={typeof sp.c === "string" ? sp.c : undefined} /> : <Standings view={view.key} hint={view.hint} me={user.id} />}</div>
         <aside>
           <Card>
@@ -82,14 +84,24 @@ async function Standings({ view, hint, me }: { view: LeaderboardView; hint: stri
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted">{hint}</p>
-      <div className="grid grid-cols-3 gap-2 sm:gap-3">
+      <div className="grid grid-cols-3 items-end gap-2 sm:gap-3">
         {[podium[1], podium[0], podium[2]].map((r, i) =>
           r ? (
-            <Link key={r.userId} href={`/members/${r.handle}`} className={cx("flex flex-col items-center rounded-2xl p-3 text-center ring-1 transition-shadow hover:shadow-[var(--shadow-pop)] sm:p-5", i === 1 ? "bg-ink text-white ring-ink sm:-translate-y-2" : "bg-surface ring-line")}>
-              <Avatar name={r.name} hue={r.avatarHue} size={i === 1 ? 56 : 44} />
-              <div className="mt-2 w-full truncate text-sm font-semibold">{r.name}</div>
-              <div className={cx("tabular font-display text-2xl font-semibold", i === 1 && "text-volt")}>{value(r)}</div>
-              <div className={cx("text-[12px]", i === 1 ? "text-white/60" : "text-muted")}>{r.rank}.º lugar</div>
+            <Link
+              key={r.userId}
+              href={`/members/${r.handle}`}
+              className={cx(
+                "flex min-w-0 flex-col items-center rounded-[var(--radius-card)] px-2 pt-4 pb-3 text-center ring-1 transition-shadow hover:shadow-[var(--shadow-pop)] sm:px-4 sm:pt-6 sm:pb-5",
+                i === 1 ? "bg-ink text-white ring-ink sm:pt-8" : "bg-surface ring-line/80",
+              )}
+            >
+              <span className="relative inline-flex">
+                <Avatar name={r.name} hue={r.avatarHue} fileId={r.avatarFileId} size={i === 1 ? 64 : 48} className={i === 1 ? "ring-4 ring-volt" : "ring-4 ring-sunken"} />
+                <span className={cx("tabular absolute -right-2 -bottom-1 grid size-6 place-items-center rounded-full text-[12px] font-bold ring-2", i === 1 ? "bg-volt text-ink ring-ink" : "bg-surface text-ink ring-line-strong")}>{r.rank}</span>
+              </span>
+              <div className="mt-3 w-full truncate text-[13px] font-semibold sm:text-sm">{r.name}</div>
+              <div className={cx("tabular font-display text-[22px] leading-tight font-semibold sm:text-[26px]", i === 1 && "text-volt")}>{value(r)}</div>
+              <div className={cx("text-[12px]", i === 1 ? "text-white/60" : "text-muted")}>pontos</div>
             </Link>
           ) : (
             <div key={i} />
@@ -109,7 +121,7 @@ async function Standings({ view, hint, me }: { view: LeaderboardView; hint: stri
             <li key={r.userId} className={cx("grid grid-cols-[40px_1fr_auto] items-center gap-3 border-b border-line/50 px-4 py-2.5 last:border-0 sm:grid-cols-[40px_1fr_90px_90px_80px]", r.userId === me && "bg-volt-soft")}>
               <RankMedal rank={r.rank} />
               <Link href={`/members/${r.handle}`} className="flex min-w-0 items-center gap-3">
-                <Avatar name={r.name} hue={r.avatarHue} size={32} />
+                <Avatar name={r.name} hue={r.avatarHue} fileId={r.avatarFileId} size={32} />
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-medium hover:underline">{r.name}{r.userId === me && " (você)"}</span>
                   <span className="block truncate text-[12px] text-muted">{r.headline}</span>
@@ -151,7 +163,7 @@ async function ByChallenge({ user, selected }: { user: Awaited<ReturnType<typeof
           {d.results.map((r) => (
             <li key={r.projectSlug} className="flex items-center gap-3 px-4 py-3">
               <RankMedal rank={r.rank} />
-              <ProjectLogo name={r.projectName} hue={r.projectLogoHue} size={36} />
+              <ProjectLogo name={r.projectName} hue={r.projectLogoHue} fileId={r.projectLogoFileId} size={36} />
               <Link href={`/projects/${r.projectSlug}`} className="min-w-0 flex-1">
                 <div className="truncate text-sm font-semibold hover:underline">{r.projectName}</div>
                 <div className="truncate text-[12px] text-muted">{r.prizeTitle ? `${r.prizeTitle} · ${r.prizeValue}` : r.projectTagline}</div>

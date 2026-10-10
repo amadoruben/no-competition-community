@@ -39,7 +39,7 @@ export default async function SubmitPage(props: PageProps<"/challenges/[slug]/su
         title={sub ? "Editar submissão" : "Submeter projecto"}
         description={!d.viewerParticipation ? "Ao submeter fica automaticamente inscrito(a) no desafio." : undefined}
       />
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
         <Card className="p-5 sm:p-6">
           {projects.length === 0 ? (
             <EmptyState

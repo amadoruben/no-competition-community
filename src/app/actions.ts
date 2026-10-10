@@ -8,14 +8,14 @@ import type { ActionState } from "@/lib/action-state";
 import { deleteAccount, emailSchema, passwordSchema, resolveUser, validateRegistration } from "@/server/accounts";
 import { auth, AuthError } from "@/server/auth";
 import { createChallenge, setChallengeStatus, setEvaluator, updateChallenge } from "@/server/challenges";
-import { addComment, createPost, setPinned, toggleReaction } from "@/server/community";
+import { addComment, createPost, deleteComment, deletePost, setPinned, toggleReaction, toggleSaved, updatePost } from "@/server/community";
 import { DomainError, invalid } from "@/server/errors";
 import { UNAVAILABLE_MESSAGE, isInfraUnavailable } from "@/server/infra-errors";
-import { setLessonComplete } from "@/server/learning";
+import { addVideo, createCollection, deleteCollection, deleteVideo, setCollectionAccess, setLessonComplete } from "@/server/learning";
 import { logger } from "@/server/logger";
 import { updateProfile } from "@/server/members";
 import { enroll, submitProject } from "@/server/participation";
-import { changeRole } from "@/server/people";
+import { changeRole, setAccessTier } from "@/server/people";
 import { addProjectMember, addProjectUpdate, createProject, removeProjectMember, updateProject } from "@/server/projects";
 import { confirmResults, publishResults, saveEvaluation, setSubmissionStatus, upsertOpportunity } from "@/server/review";
 import { currentUser, homeFor } from "@/server/session";
@@ -371,23 +371,48 @@ export async function updateProfileAction(_: ActionState, fd: FormData): Promise
 
 export async function createPostAction(_: ActionState, fd: FormData): Promise<ActionState> {
   const u = await actor();
+  const images = fd.getAll("images").filter((f) => f instanceof Blob && f.size > 0);
   return attempt(
-    () => createPost(u, { kind: str(fd, "kind") || "discussion", title: str(fd, "title"), body: str(fd, "body"), challengeId: optStr(fd, "challengeId"), projectId: optStr(fd, "projectId") }),
+    () =>
+      createPost(
+        u,
+        { kind: str(fd, "kind") || "discussion", title: str(fd, "title"), body: str(fd, "body"), videoUrl: str(fd, "videoUrl"), challengeId: optStr(fd, "challengeId"), projectId: optStr(fd, "projectId") },
+        images,
+      ),
     "Publicado.",
   );
 }
 
-export async function commentAction(postId: string, _: ActionState, fd: FormData): Promise<ActionState> {
+export async function updatePostAction(postId: string, _: ActionState, fd: FormData): Promise<ActionState> {
   const u = await actor();
-  return attempt(() => addComment(u, postId, str(fd, "body")), "Comentário publicado.");
+  return attempt(() => updatePost(u, postId, { kind: str(fd, "kind"), title: str(fd, "title"), body: str(fd, "body") }), "Publicação actualizada.");
 }
 
-/** Returns the persisted state so optimistic UI can reconcile (or roll back on failure). */
-export async function reactAction(postId: string): Promise<{ ok: boolean; active?: boolean; error?: string }> {
+export async function commentAction(postId: string, _: ActionState, fd: FormData): Promise<ActionState> {
+  const u = await actor();
+  return attempt(() => addComment(u, postId, str(fd, "body"), optStr(fd, "parentId")), "Comentário publicado.");
+}
+
+export async function deleteCommentAction(commentId: string) {
+  const u = await actor();
+  return attempt(() => deleteComment(u, commentId), "Comentário removido.");
+}
+
+/** Returns the persisted state and the real count so optimistic UI can reconcile (or roll back on failure). */
+export async function reactAction(postId: string): Promise<{ ok: boolean; active?: boolean; count?: number; error?: string }> {
+  const u = await actor();
+  let state: { active: boolean; count: number } | undefined;
+  const r = await attempt(async () => {
+    state = await toggleReaction(u, postId);
+  });
+  return r.ok && state ? { ok: true, ...state } : { ok: false, error: r.error };
+}
+
+export async function saveAction(postId: string): Promise<{ ok: boolean; active?: boolean; error?: string }> {
   const u = await actor();
   let active = false;
   const r = await attempt(async () => {
-    active = await toggleReaction(u, postId);
+    active = await toggleSaved(u, postId);
   });
   return r.ok ? { ok: true, active } : { ok: false, error: r.error };
 }
@@ -399,5 +424,46 @@ export async function pinAction(postId: string, pinned: boolean) {
 
 export async function lessonAction(lessonId: string, complete: boolean) {
   const u = await actor();
-  return attempt(() => setLessonComplete(u, lessonId, complete), complete ? "Aula concluída." : undefined);
+  return attempt(() => setLessonComplete(u, lessonId, complete), complete ? "Marcado como visto." : undefined);
+}
+
+export async function deletePostAction(postId: string) {
+  const u = await actor();
+  return attempt(() => deletePost(u, postId), "Publicação removida.");
+}
+
+// Videos (admin) ------------------------------------------------------------------
+
+export async function createCollectionAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  const u = await actor();
+  return attempt(() => createCollection(u, { title: str(fd, "title"), description: str(fd, "description"), accessTier: str(fd, "accessTier") }), "Colecção criada.");
+}
+
+export async function addVideoAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  const u = await actor();
+  return attempt(
+    () => addVideo(u, { courseId: str(fd, "courseId"), section: str(fd, "section"), title: str(fd, "title"), videoUrl: str(fd, "videoUrl"), content: str(fd, "content"), durationMin: str(fd, "durationMin") }),
+    "Vídeo publicado.",
+  );
+}
+
+export async function collectionAccessAction(courseId: string, _: ActionState, fd: FormData): Promise<ActionState> {
+  const u = await actor();
+  return attempt(() => setCollectionAccess(u, courseId, str(fd, "accessTier")), "Acesso actualizado.");
+}
+
+export async function deleteCollectionAction(courseId: string, _: ActionState): Promise<ActionState> {
+  const u = await actor();
+  return attempt(() => deleteCollection(u, courseId), "Colecção removida.");
+}
+
+export async function deleteVideoAction(lessonId: string, _: ActionState): Promise<ActionState> {
+  const u = await actor();
+  return attempt(() => deleteVideo(u, lessonId), "Vídeo removido.");
+}
+
+export async function accessTierAction(userId: string, _: ActionState, fd: FormData): Promise<ActionState> {
+  const u = await actor();
+  const tier = str(fd, "accessTier");
+  return attempt(() => setAccessTier(u, userId, tier), tier === "full" ? "Acesso completo atribuído." : "Acesso livre.");
 }

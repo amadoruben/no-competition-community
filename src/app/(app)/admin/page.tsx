@@ -1,7 +1,8 @@
 import { ArrowRight, Plus } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ChallengeCover, PhaseBadge } from "@/components/domain";
+import { CoverTile, glyphFor } from "@/components/cover-art";
+import { PhaseBadge } from "@/components/domain";
 import { FirstSteps } from "@/components/first-steps";
 import { Badge, BarList, ButtonLink, Card, CardHeader, cx, EmptyState, PageHeader, Progress } from "@/components/ui";
 import { fmtDay, timeAgo } from "@/lib/format";
@@ -10,7 +11,7 @@ import { investorOverview } from "@/server/admin";
 import { OPPORTUNITY_LABEL } from "@/server/review";
 import { requireUser } from "@/server/session";
 
-export const metadata: Metadata = { title: "Painel do investidor" };
+export const metadata: Metadata = { title: "Administração" };
 
 const toneClass = { volt: "bg-volt text-ink", warn: "bg-warn-soft text-warn", info: "bg-info-soft text-info", neutral: "bg-sunken text-muted" };
 
@@ -27,10 +28,12 @@ export default async function AdminPage() {
   const first = o.rows[0] ? `/admin/challenges/${o.rows[0].id}` : "/admin/challenges/new";
   const s = o.setup;
   const steps = [
+    { done: s.hasPosts, title: "Publicar a mensagem de boas-vindas", detail: "Um anúncio oficial fica fixado no topo do Início de todos os membros.", href: "/dashboard#publicar", cta: "Escrever" },
+    { done: s.hasVideos, title: "Publicar o primeiro vídeo", detail: "Crie uma colecção e cole o link do YouTube ou Vimeo. Escolha se é aberta a todos ou exclusiva.", href: "/admin/videos", cta: "Gerir vídeos" },
     { done: s.challengeCreated, title: "Criar o primeiro desafio", detail: "Tema, prazos, critérios de avaliação e prémios. Fica em rascunho até o publicar.", href: "/admin/challenges/new", cta: "Criar desafio" },
     { done: s.challengePublished, title: "Publicar o desafio", detail: "Os membros passam a vê-lo e a inscrever-se.", href: first, cta: "Abrir desafio" },
     { done: s.hasMembers, title: "Trazer os primeiros membros", detail: "Partilhe o endereço da plataforma: quem se regista entra como membro.", href: "/admin/people", cta: "Ver membros" },
-    { done: s.hasEvaluators, title: "Nomear avaliadores", detail: "Em Membros e papéis, torne avaliador(a) quem vai pontuar as submissões.", href: "/admin/people", cta: "Membros e papéis" },
+    { done: s.hasEvaluators, title: "Nomear avaliadores", detail: "Em Membros e acessos, torne avaliador(a) quem vai pontuar as submissões.", href: "/admin/people", cta: "Membros e acessos" },
     { done: s.evaluatorsAssigned, title: "Atribuir avaliadores ao desafio", detail: "Cada avaliador(a) só vê as submissões dos desafios atribuídos.", href: `${first}?tab=evaluators`, cta: "Atribuir" },
   ];
 
@@ -38,8 +41,8 @@ export default async function AdminPage() {
     <div className="space-y-6">
       <PageHeader
         eyebrow={`Olá, ${user.name.split(" ")[0]}`}
-        title="Painel do investidor"
-        description="O ciclo de cada desafio, da publicação aos resultados, e as acções que dependem de si."
+        title="Administração"
+        description="Comunidade, vídeos, desafios e avaliações da No Competition: o que está a decorrer e o que depende de si."
         actions={
           <>
             <ButtonLink href="/admin/opportunities" variant="secondary">Pipeline</ButtonLink>
@@ -63,7 +66,7 @@ export default async function AdminPage() {
       )}
 
       {s.challengeCreated && (
-      <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_340px]">
         <Card className="min-w-0">
           <CardHeader title="Ciclo dos desafios" subtitle="Próxima acção para cada desafio" />
           {o.rows.length === 0 ? (
@@ -73,7 +76,7 @@ export default async function AdminPage() {
               {o.rows.map((r) => (
                 <li key={r.id}>
                   <Link href={`/admin/challenges/${r.id}`} className="group flex flex-col gap-3 px-5 py-4 hover:bg-sunken/40 sm:flex-row sm:items-center">
-                    <ChallengeCover hue={r.coverHue} className="hidden size-11 shrink-0 rounded-xl sm:block" />
+                    <CoverTile hue={r.coverHue} glyph={glyphFor(r.title)} className="hidden size-11 rounded-xl sm:grid" />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="truncate font-medium group-hover:underline">{r.title}</span>

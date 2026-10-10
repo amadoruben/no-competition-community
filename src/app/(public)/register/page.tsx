@@ -13,13 +13,13 @@ export default async function RegisterPage() {
   return (
     <AuthShell
       title="Junte-se à comunidade"
-      subtitle="Participe em desafios, apresente o seu projecto e ganhe visibilidade junto de investidores."
+      subtitle="A comunidade oficial da No Competition. A conta é gratuita."
       aside={
         <ul className="space-y-6">
           {[
-            ["Desafios com critérios públicos", "Sabe desde o início como vai ser avaliado."],
-            ["Feedback de avaliadores", "Cada submissão recebe notas por critério e comentários."],
-            ["Mérito, não popularidade", "As classificações separam participação de qualidade."],
+            ["Comunidade", "Anúncios oficiais da No Competition, conversas e perguntas entre membros."],
+            ["Vídeos exclusivos", "Episódios, bastidores e ensinamentos, organizados por colecção."],
+            ["Desafios com prémios", "Regras e critérios públicos, avaliação independente e resultados transparentes."],
           ].map(([t, b]) => (
             <li key={t}>
               <p className="font-display text-2xl font-semibold">{t}</p>
