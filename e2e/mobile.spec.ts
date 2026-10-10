@@ -16,13 +16,13 @@ test("member pages fit a phone screen", async ({ browser }) => {
 test("the feed is made for thumbs: no overflow with the composer open, comfortable touch targets", async ({ browser }) => {
   const page = await loginAs(browser, MEMBER);
   await page.goto("/dashboard");
-  await page.getByRole("button", { name: "Partilhe algo com a comunidade…" }).click();
+  await page.getByRole("button", { name: "Escreva algo…" }).click();
   await expect(page.locator("#publicar").getByLabel("Texto da publicação")).toBeFocused();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - Math.round(window.visualViewport!.width));
   expect(overflow, "composer overflows").toBeLessThanOrEqual(0);
   const post = page.locator("article").first();
-  for (const name of [/^(Gosto|Retirar gosto)$/, /^Comentar$/, /^Partilhar$/, /^(Guardar|Remover dos guardados)$/, /^Mais acções$/]) {
-    const box = await post.getByRole("button", { name }).boundingBox();
+  for (const [role, name] of [["button", /^(Gosto|Retirar gosto)$/], ["link", /^Comentar$/], ["button", /^Partilhar$/], ["button", /^(Guardar|Remover dos guardados)$/], ["button", /^Mais acções$/]] as const) {
+    const box = await post.getByRole(role, { name }).boundingBox();
     expect(Math.min(box!.width, box!.height), `${name} is too small to tap`).toBeGreaterThanOrEqual(36);
   }
   // The post page (conversation) fits too.

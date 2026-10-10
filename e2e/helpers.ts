@@ -17,7 +17,7 @@ export const EVALUATOR = "avaliador@demo.ncc";
 
 /** Opens the composer on Início and publishes a post; returns the composer for further checks. */
 export async function publish(page: Page, post: { title?: string; body: string; kind?: "Conversa" | "Pergunta" | "Progresso" | "Anúncio oficial"; photos?: { name: string; mimeType: string; buffer: Buffer }[] }) {
-  await page.getByRole("button", { name: "Partilhe algo com a comunidade…" }).click();
+  await page.getByRole("button", { name: "Escreva algo…" }).click();
   const composer = page.locator("#publicar");
   if (post.kind) await composer.locator("label", { hasText: post.kind }).click();
   if (post.title) await composer.getByLabel("Título (opcional)").fill(post.title);
@@ -27,7 +27,7 @@ export async function publish(page: Page, post: { title?: string; body: string; 
     await expect(composer.getByRole("img", { name: `Fotografia ${post.photos.length}` })).toBeVisible();
   }
   await composer.getByRole("button", { name: "Publicar", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Partilhe algo com a comunidade…" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Escreva algo…" })).toBeVisible();
 }
 
 /** A post in the feed, found by a link to it (its title). */

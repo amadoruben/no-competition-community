@@ -86,7 +86,7 @@ const commentFields = {
 };
 
 /** The latest `per` top-level comments of each post, oldest first, for the feed preview. */
-async function previewComments(postIds: string[], per = 2) {
+async function previewComments(postIds: string[], per = 5) {
   const map = new Map<string, Awaited<ReturnType<typeof threadOf>>>();
   if (!postIds.length) return map;
   const ranked = db

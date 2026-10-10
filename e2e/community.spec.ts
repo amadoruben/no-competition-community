@@ -52,7 +52,9 @@ test("Início: members post, the admin moderates, the profile shows the activity
   await publish(mem, { title, body: "Sou novo por aqui e estou a construir um projecto de energia." });
   await expect(mem.getByRole("link", { name: title })).toBeVisible();
 
-  await mem.getByRole("navigation", { name: "Principal" }).getByRole("link", { name: "Perfil" }).click();
+  // On a computer the profile is in the account menu (the photo at the top right).
+  await mem.getByRole("button", { name: /^Conta de / }).click();
+  await mem.getByRole("menuitem", { name: "O meu perfil" }).click();
   await expect(mem.getByRole("link", { name: "Editar perfil" })).toBeVisible();
   await expect(mem.getByRole("link", { name: title })).toBeVisible();
 
@@ -84,7 +86,7 @@ test("first content: the admin's welcome announcement is pinned and official for
   await mem.goto("/dashboard");
   await expect(mem.locator("article").first()).toHaveAccessibleName(title);
   // Members never get the "official announcement" option, nor moderation.
-  await mem.getByRole("button", { name: "Partilhe algo com a comunidade…" }).click();
+  await mem.getByRole("button", { name: "Escreva algo…" }).click();
   await expect(mem.locator("#publicar").getByRole("radio", { name: "Anúncio oficial" })).toHaveCount(0);
   await postCard(mem, title).getByRole("button", { name: "Mais acções" }).click();
   await expect(mem.getByRole("menuitem", { name: "Remover publicação" })).toHaveCount(0);
@@ -109,7 +111,11 @@ test("feed: photos, reactions, saved posts and replies persist", async ({ browse
       { name: "b.png", mimeType: "image/png", buffer: png(160, 90, [40, 40, 40]) },
     ],
   });
-  const card = postCard(mem, title);
+  // The feed row shows a thumbnail; the photos themselves are on the post page.
+  await expect(postCard(mem, title).locator('img[src^="/files/"]')).toHaveCount(1);
+  await postCard(mem, title).getByRole("link", { name: title }).click();
+  await expect(mem).toHaveURL(/\/community\//);
+  const card = mem.locator("article").first();
   await expect(card.getByRole("group", { name: /2 fotografias/ })).toBeVisible();
   // The photos are served (signed-in only) and decode in the browser.
   const first = card.getByRole("img", { name: /fotografia 1 de 2/ });
@@ -135,11 +141,15 @@ test("feed: photos, reactions, saved posts and replies persist", async ({ browse
   await mem.goto("/dashboard?f=saved");
   await expect(mem.getByRole("link", { name: title })).toHaveCount(0);
 
-  // Comment inline, then reply on the post page.
+  // "Comentar" in the feed opens the conversation; comment there, and the feed row shows who commented.
   await other.goto("/dashboard");
-  await postCard(other, title).getByLabel("Escrever um comentário").fill("Que poupança mediram?");
-  await postCard(other, title).getByRole("button", { name: "Publicar comentário" }).click();
-  await expect(postCard(other, title).getByText("Que poupança mediram?")).toBeVisible();
+  await postCard(other, title).getByRole("link", { name: "Comentar" }).click();
+  await expect(other).toHaveURL(/\/community\/.+#comentar$/);
+  await other.getByLabel("Escrever um comentário").fill("Que poupança mediram?");
+  await other.getByRole("button", { name: "Comentar" }).click();
+  await expect(other.getByText("Que poupança mediram?")).toBeVisible();
+  await other.goto("/dashboard");
+  await expect(postCard(other, title).getByText(/^Novo comentário/)).toBeVisible();
   await mem.goto("/dashboard");
   await postCard(mem, title).getByRole("link", { name: title }).click();
   await mem.getByRole("button", { name: "Responder" }).click();

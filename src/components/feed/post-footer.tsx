@@ -1,13 +1,14 @@
 "use client";
 
 import clsx from "clsx";
-import { Bookmark, MessagesSquare, Share2, SmilePlus } from "lucide-react";
+import { Bookmark, MessageCircle, MessagesSquare, Share2, SmilePlus } from "lucide-react";
 import Link from "next/link";
 import { useRef, useState, useTransition, type ReactNode } from "react";
 import { commentAction, reactAction, saveAction } from "@/app/actions";
 import { REACTION_EMOJI, REACTION_KINDS, type ReactionKind } from "@/lib/reactions";
 import type { ReactionCount } from "@/server/community";
 import { toast } from "../toaster";
+import { Avatar } from "../ui";
 
 
 /** Shares the post with the device's share sheet, or copies its link. */
@@ -50,6 +51,7 @@ export function PostFooter({
   comments,
   shown,
   inlineComment,
+  activity,
   children,
 }: {
   postId: string;
@@ -61,6 +63,8 @@ export function PostFooter({
   /** Comments already listed under the post. */
   shown: number;
   inlineComment?: boolean;
+  /** Feed rows: the people who commented last and when (a ready "há 2 h" text), instead of the full action bar. */
+  activity?: { people: { name: string; hue: number; fileId: string | null }[]; last: string | null };
   children?: ReactNode;
 }) {
   // Server props win whenever they change (after any revalidation).
@@ -114,6 +118,91 @@ export function PostFooter({
   const hearts = state.counts.find((c) => c.kind === "heart")?.n ?? 0;
   const others = state.counts.filter((c) => c.kind !== "heart");
   const total = state.counts.reduce((t, c) => t + c.n, 0);
+
+  if (activity) {
+    // The feed row: one quiet line under the post, as in Skool.
+    const small = "inline-flex h-9 min-w-9 items-center justify-center gap-1.5 rounded-full px-2.5 text-[13px] font-semibold ring-1 ring-inset transition-colors active:scale-95 motion-reduce:active:scale-100";
+    return (
+      <div className="flex flex-wrap items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => react("heart")}
+          aria-pressed={state.mine === "heart"}
+          aria-label={state.mine === "heart" ? "Retirar gosto" : "Gosto"}
+          className={clsx(small, state.mine === "heart" ? "bg-gold-soft text-ink ring-gold" : "bg-surface text-ink-2 ring-line hover:bg-mist")}
+        >
+          <span aria-hidden onAnimationEnd={() => setPop(null)} className={clsx("text-[14px] leading-none", pop === "heart" && "animate-pop")}>
+            {REACTION_EMOJI.heart.emoji}
+          </span>
+          <span className="tabular">{hearts}</span>
+        </button>
+        {others.slice(0, 2).map((c) => (
+          <button
+            key={c.kind}
+            type="button"
+            onClick={() => react(c.kind)}
+            aria-pressed={state.mine === c.kind}
+            aria-label={`${REACTION_EMOJI[c.kind].label}: ${c.n}${state.mine === c.kind ? " (a sua reacção; retirar)" : ""}`}
+            className={clsx(small, state.mine === c.kind ? "bg-gold-soft text-ink ring-gold" : "bg-surface text-ink-2 ring-line hover:bg-mist")}
+          >
+            <span aria-hidden className={clsx("text-[14px] leading-none", pop === c.kind && "animate-pop")} onAnimationEnd={() => setPop(null)}>
+              {REACTION_EMOJI[c.kind].emoji}
+            </span>
+            <span className="tabular">{c.n}</span>
+          </button>
+        ))}
+        <div className="relative">
+          <button type="button" onClick={() => setPicker((v) => !v)} aria-expanded={picker} aria-label="Escolher reacção" className={clsx(small, "bg-surface text-muted ring-line hover:bg-mist hover:text-ink")}>
+            <SmilePlus className="size-4" />
+          </button>
+          {picker && (
+            <div role="group" aria-label="Reacções" className="absolute bottom-10 left-0 z-20 flex animate-rise gap-0.5 rounded-full bg-surface p-1 shadow-[var(--shadow-pop)] ring-1 ring-line">
+              {REACTION_KINDS.map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => react(k)}
+                  aria-label={REACTION_EMOJI[k].label}
+                  aria-pressed={state.mine === k}
+                  className={clsx("grid size-10 place-items-center rounded-full text-[21px] transition hover:scale-110 hover:bg-sunken", state.mine === k && "bg-gold-soft")}
+                >
+                  {REACTION_EMOJI[k].emoji}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <Link href={`/community/${postId}#comentar`} aria-label="Comentar" className="inline-flex h-9 min-w-9 items-center gap-1.5 rounded-full px-2.5 text-[13px] font-semibold text-ink-2 hover:bg-sunken hover:text-ink">
+          <MessageCircle className="size-[17px]" /> <span className="tabular">{comments}</span>
+        </Link>
+        {activity.people.length > 0 && (
+          <Link href={`/community/${postId}#comentarios`} className="ml-1 flex min-w-0 items-center gap-2">
+            <span className="flex -space-x-1.5" aria-hidden>
+              {activity.people.map((p, i) => (
+                <span key={i} className="rounded-full ring-2 ring-surface">
+                  <Avatar name={p.name} hue={p.hue} fileId={p.fileId} size={24} />
+                </span>
+              ))}
+            </span>
+            {activity.last && <span className="hidden truncate text-[12.5px] font-semibold text-gold-strong sm:inline">Novo comentário {activity.last}</span>}
+          </Link>
+        )}
+        <span className="flex-1" />
+        <button type="button" aria-label="Partilhar" className="grid size-9 place-items-center rounded-full text-muted hover:bg-sunken hover:text-ink" onClick={() => sharePost(postId, title)}>
+          <Share2 className="size-4" />
+        </button>
+        <button type="button" onClick={toggleSave} aria-pressed={isSaved} aria-label={isSaved ? "Remover dos guardados" : "Guardar"} className={clsx("grid size-9 place-items-center rounded-full hover:bg-sunken", isSaved ? "text-gold-strong" : "text-muted hover:text-ink")}>
+          <Bookmark className={clsx("size-4", isSaved && "fill-current")} />
+        </button>
+        {total > 0 && (
+          <p className="sr-only" aria-live="polite">
+            {total === 1 ? "1 reacção" : `${total} reacções`}
+          </p>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="px-3 pb-3 sm:px-4">
       <div className="flex flex-wrap items-center gap-1.5">

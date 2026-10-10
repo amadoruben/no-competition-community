@@ -1,34 +1,31 @@
 "use client";
 
 import clsx from "clsx";
-import { ClipboardCheck, Gauge } from "lucide-react";
+import { ClipboardCheck, Gauge, Search } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Role } from "@/db/schema";
-import { mainItems, toolsFor } from "@/lib/nav";
+import { mainItems, sectionTabs, toolsFor } from "@/lib/nav";
 import { Avatar } from "./ui";
 
-/** Desktop: the five areas as tabs in the header. */
-export function TopNav({ handle }: { handle: string }) {
+/** Desktop: the community's sections as text tabs under the header row, Skool-style. */
+export function TopNav() {
   const pathname = usePathname();
   return (
-    <nav aria-label="Principal" className="hidden h-full lg:block">
-      <ul className="flex h-full items-stretch gap-1">
-        {mainItems(handle).map((item) => {
+    <nav aria-label="Principal" className="hidden lg:block">
+      <ul className="flex items-stretch gap-7">
+        {sectionTabs().map((item) => {
           const active = item.match(pathname);
-          const Icon = item.icon;
           return (
             <li key={item.href} className="flex">
               <Link
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 className={clsx(
-                  "relative flex items-center gap-2 rounded-md px-3 text-[14px] font-medium transition-colors",
-                  "after:absolute after:inset-x-3 after:bottom-0 after:h-[2.5px] after:rounded-full after:transition-colors",
-                  active ? "text-ink after:bg-gold" : "text-muted after:bg-transparent hover:text-ink",
+                  "-mb-px flex h-11 items-center border-b-[2.5px] text-[14.5px] transition-colors",
+                  active ? "border-ink font-semibold text-ink" : "border-transparent font-medium text-muted hover:text-ink",
                 )}
               >
-                <Icon className={clsx("size-[18px]", active && "text-gold-strong")} strokeWidth={active ? 2.2 : 1.8} />
                 {item.label}
               </Link>
             </li>
@@ -36,6 +33,19 @@ export function TopNav({ handle }: { handle: string }) {
         })}
       </ul>
     </nav>
+  );
+}
+
+/** The search field in the header: finds members by name, skill or city. */
+export function HeaderSearch() {
+  return (
+    <form action="/members" role="search" className="hidden max-w-[480px] flex-1 md:block">
+      <label className="flex h-10 items-center gap-2.5 rounded-xl bg-sunken px-3.5 text-muted ring-1 ring-transparent ring-inset focus-within:bg-surface focus-within:ring-ink">
+        <Search className="size-[18px] shrink-0" />
+        <span className="sr-only">Pesquisar membros</span>
+        <input name="q" type="search" placeholder="Pesquisar" className="min-w-0 flex-1 bg-transparent text-[14.5px] text-ink outline-none placeholder:text-muted" />
+      </label>
+    </form>
   );
 }
 

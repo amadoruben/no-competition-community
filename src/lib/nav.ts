@@ -1,4 +1,4 @@
-import { BriefcaseBusiness, Clapperboard, ClipboardCheck, Gauge, House, Share2, SquarePlay, Trophy, UserCog, UserRound, Users, type LucideIcon } from "lucide-react";
+import { BriefcaseBusiness, Clapperboard, ClipboardCheck, Gauge, House, Medal, Share2, SquarePlay, Trophy, UserCog, UserRound, Users, type LucideIcon } from "lucide-react";
 import type { Role } from "@/db/schema";
 
 /** Navigation model shared by the server layout and the client navigation components. */
@@ -15,6 +15,20 @@ export function mainItems(handle: string): Item[] {
     { href: "/challenges", label: "Desafios", icon: Trophy, match: under("/challenges") },
     { href: "/members", label: "Membros", icon: Users, match: (p) => !own(p) && under("/members", "/leaderboard", "/projects")(p) },
     { href: "/profile", label: "Perfil", icon: UserRound, match: own },
+  ];
+}
+
+/**
+ * Desktop: the community's sections as text tabs under the header, Skool-style.
+ * The profile lives in the account menu (the photo at the top right).
+ */
+export function sectionTabs(): Item[] {
+  return [
+    { href: "/dashboard", label: "Comunidade", icon: House, match: under("/dashboard", "/community") },
+    { href: "/videos", label: "Vídeos", icon: SquarePlay, match: under("/videos", "/learn") },
+    { href: "/challenges", label: "Desafios", icon: Trophy, match: under("/challenges") },
+    { href: "/members", label: "Membros", icon: Users, match: under("/members", "/projects") },
+    { href: "/leaderboard", label: "Classificação", icon: Medal, match: under("/leaderboard") },
   ];
 }
 

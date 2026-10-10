@@ -136,10 +136,10 @@ export function Composer({
 
   if (!open)
     return (
-      <div id="publicar" className="-mx-4 flex items-center gap-3 border-y border-line/80 bg-surface px-4 py-3 sm:mx-0 sm:rounded-[20px] sm:border-0 sm:px-4 sm:shadow-[var(--shadow-card)] sm:ring-1 sm:ring-line/80">
-        <Avatar name={name} hue={hue} fileId={fileId} size={40} />
-        <button type="button" onClick={() => setOpen(true)} className="h-10 min-w-0 flex-1 truncate rounded-full bg-sunken px-4 text-left text-[15px] text-muted hover:bg-line/60">
-          Partilhe algo com a comunidade…
+      <div id="publicar" className="flex items-center gap-3 rounded-2xl bg-surface px-4 py-3 shadow-[var(--shadow-card)] ring-1 ring-line/80">
+        <Avatar name={name} hue={hue} fileId={fileId} size={38} />
+        <button type="button" onClick={() => setOpen(true)} className="h-10 min-w-0 flex-1 truncate rounded-xl px-1 text-left text-[16px] text-muted hover:text-ink-2">
+          Escreva algo…
         </button>
         <button type="button" aria-label="Publicar fotografias" onClick={() => picker.current?.click()} className="grid size-10 shrink-0 place-items-center rounded-full text-ink-2 hover:bg-sunken">
           <ImagePlus className="size-5" />

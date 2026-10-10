@@ -20,7 +20,7 @@ for (const s of SCREENS) {
     const feed = await page.locator("article").first().boundingBox();
     expect(feed!.width, "feed column too wide to read comfortably").toBeLessThanOrEqual(690);
     await expect(page.getByRole("complementary", { name: "Na comunidade" })).toBeVisible({ visible: s.rail });
-    // Without the side column, challenges stay one swipe away above the feed.
-    if (!s.rail) await expect(page.getByRole("heading", { name: /^Desafios/ }).first()).toBeVisible();
+    // Writing is the first thing on every screen.
+    await expect(page.getByRole("button", { name: "Escreva algo…" })).toBeVisible();
   });
 }

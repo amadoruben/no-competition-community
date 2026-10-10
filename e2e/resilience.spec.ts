@@ -70,7 +70,7 @@ test("data persists across an application restart", async ({ browser }) => {
 test("database outage: honest errors, no false confirmations, automatic recovery", async ({ browser }) => {
   const inv = await loginAs(browser, INVESTOR);
   await inv.goto("/community");
-  await inv.getByRole("button", { name: "Partilhe algo com a comunidade…" }).click();
+  await inv.getByRole("button", { name: "Escreva algo…" }).click();
   await inv.locator("#publicar").getByLabel("Título (opcional)").fill("Durante a falha");
   await inv.locator("#publicar").getByLabel("Texto da publicação").fill("Isto não deve ser guardado.");
 

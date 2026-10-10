@@ -214,7 +214,7 @@ export function FeedPreview() {
       <div className="space-y-3 bg-mist p-3 sm:p-4">
         <div className="flex items-center gap-2.5 rounded-xl bg-surface p-2.5 ring-1 ring-line">
           <Someone size={30} />
-          <span className="min-w-0 flex-1 truncate rounded-full bg-sunken px-3 py-1.5 text-[11.5px] text-muted">Partilhe algo com a comunidade…</span>
+          <span className="min-w-0 flex-1 truncate rounded-full bg-sunken px-3 py-1.5 text-[11.5px] text-muted">Escreva algo…</span>
           <ImageIcon className="size-4 shrink-0 text-ink-2" />
           <Video className="size-4 shrink-0 text-ink-2" />
         </div>
