@@ -170,8 +170,12 @@ export async function importDatabase(db: DB, file: ExportFile) {
       const target = new Set((await columnsOf(tx as unknown as DB, t)).map((c) => c.name));
       const cols = dump.columns.filter((c) => target.has(c.name));
       const idx = cols.map((c) => dump.columns.indexOf(c));
-      for (let i = 0; i < dump.rows.length; i += 500) {
-        const batch = dump.rows.slice(i, i + 500);
+      // Self-references (a reply → its comment): rows without one go first, so parents precede children.
+      const self = (await selfReferences(tx as unknown as DB, t)).map((n) => dump.columns.findIndex((c) => c.name === n)).filter((i) => i >= 0);
+      const linked = (row: unknown[]) => Number(self.some((i) => row[i] !== null));
+      const rows = self.length ? [...dump.rows].sort((a, b) => linked(a) - linked(b)) : dump.rows;
+      for (let i = 0; i < rows.length; i += 500) {
+        const batch = rows.slice(i, i + 500);
         const values = sql.join(
           batch.map((row) => sql`(${sql.join(idx.map((j, k) => cell(row[j], cols[k].type)), sql`, `)})`),
           sql`, `,
@@ -180,6 +184,17 @@ export async function importDatabase(db: DB, file: ExportFile) {
       }
     }
   });
+}
+
+/** Columns of `table` that reference the same table (one level deep in this schema). */
+async function selfReferences(db: DB, table: string) {
+  const rows = await query<{ name: string }>(
+    db,
+    sql`select a.attname as name from pg_constraint c
+        join pg_attribute a on a.attrelid = c.conrelid and a.attnum = any(c.conkey)
+        where c.contype = 'f' and c.conrelid = ${`public.${table}`}::regclass and c.confrelid = c.conrelid`,
+  );
+  return rows.map((r) => r.name);
 }
 
 function cell(v: unknown, type: string) {

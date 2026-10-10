@@ -13,6 +13,26 @@ test("member pages fit a phone screen", async ({ browser }) => {
   }
 });
 
+test("the feed is made for thumbs: no overflow with the composer open, comfortable touch targets", async ({ browser }) => {
+  const page = await loginAs(browser, MEMBER);
+  await page.goto("/dashboard");
+  await page.getByRole("button", { name: "Partilhe algo com a comunidade…" }).click();
+  await expect(page.locator("#publicar").getByLabel("Texto da publicação")).toBeFocused();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - Math.round(window.visualViewport!.width));
+  expect(overflow, "composer overflows").toBeLessThanOrEqual(0);
+  const post = page.locator("article").first();
+  for (const name of [/^(Gosto|Retirar gosto)$/, /^Comentar$/, /^Partilhar$/, /^(Guardar|Remover dos guardados)$/, /^Mais acções$/]) {
+    const box = await post.getByRole("button", { name }).boundingBox();
+    expect(Math.min(box!.width, box!.height), `${name} is too small to tap`).toBeGreaterThanOrEqual(36);
+  }
+  // The post page (conversation) fits too.
+  await post.getByRole("button", { name: "Mais acções" }).click();
+  await page.getByRole("menuitem", { name: "Abrir publicação" }).click();
+  await expect(page).toHaveURL(/\/community\//);
+  await expect(page.getByRole("heading", { name: /^(\d+ )?coment/i })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - Math.round(window.visualViewport!.width))).toBeLessThanOrEqual(0);
+});
+
 test("investor panel fits a phone screen", async ({ browser }) => {
   const page = await loginAs(browser, INVESTOR);
   for (const path of ["/admin", "/admin/videos", "/admin/people", "/admin/opportunities", "/admin/challenges/new"]) {

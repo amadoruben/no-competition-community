@@ -26,7 +26,7 @@ export function Toaster() {
     };
   }, []);
   return (
-    <div aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-4 z-[60] flex flex-col items-center gap-2 px-4">
+    <div aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+5rem)] z-[60] flex flex-col items-center gap-2 px-4 lg:bottom-4">
       {items.map((t) => (
         <div key={t.id} role={t.tone === "bad" ? "alert" : "status"} className={`pointer-events-auto flex max-w-md items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-medium shadow-[var(--shadow-pop)] ${t.tone === "bad" ? "bg-bad text-white" : "bg-ink text-white"}`}>
           {t.tone === "bad" ? (

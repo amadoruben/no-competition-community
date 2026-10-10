@@ -402,22 +402,65 @@ export const posts = pgTable(
     challengeId: uuid("challenge_id").references(() => challenges.id, { onDelete: "set null" }),
     projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
     pinned: boolean("pinned").notNull().default(false),
+    /** A YouTube, Vimeo or https video file link (see lib/video): embedded, never uploaded. */
+    videoUrl: text("video_url"),
+    /** Set when the author edits the text; shown as "editado". */
+    editedAt: ts("edited_at"),
     createdAt: createdAt(),
   },
   (t) => [index("posts_created").on(t.createdAt)],
 );
 
-export const comments = pgTable("comments", {
-  id: id(),
-  postId: uuid("post_id")
-    .notNull()
-    .references(() => posts.id, { onDelete: "cascade" }),
-  authorId: uuid("author_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  body: text("body").notNull(),
-  createdAt: createdAt(),
-});
+/** Photos attached to a post, in display order. Dimensions are read from the file on upload. */
+export const postMedia = pgTable(
+  "post_media",
+  {
+    id: id(),
+    postId: uuid("post_id")
+      .notNull()
+      .references(() => posts.id, { onDelete: "cascade" }),
+    fileId: uuid("file_id")
+      .notNull()
+      .references(() => files.id, { onDelete: "cascade" }),
+    position: integer("position").notNull().default(0),
+    width: integer("width").notNull(),
+    height: integer("height").notNull(),
+  },
+  (t) => [index("post_media_post").on(t.postId, t.position)],
+);
+
+/** Posts a member keeps to read later. Private to that member. */
+export const savedPosts = pgTable(
+  "saved_posts",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    postId: uuid("post_id")
+      .notNull()
+      .references(() => posts.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.postId] }), index("saved_posts_user").on(t.userId, t.createdAt)],
+);
+
+export const comments = pgTable(
+  "comments",
+  {
+    id: id(),
+    postId: uuid("post_id")
+      .notNull()
+      .references(() => posts.id, { onDelete: "cascade" }),
+    authorId: uuid("author_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** Replies point at a top-level comment (one level deep). */
+    parentId: uuid("parent_id").references((): AnyPgColumn => comments.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("comments_post").on(t.postId, t.createdAt)],
+);
 
 export const reactions = pgTable(
   "reactions",

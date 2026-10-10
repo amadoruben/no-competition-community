@@ -36,12 +36,14 @@
   --color-info-soft: #e5eafc;
   --color-violet: #6d3fc0;
   --color-violet-soft: #efe8fb;
+  --color-heart: #e0284a; /* reactions only */
 
   --radius-card: 16px;
   --shadow-card: 0 1px 2px rgb(16 18 22 / 0.05);
   --shadow-pop: 0 12px 32px -12px rgb(16 18 22 / 0.28), 0 2px 6px -2px rgb(16 18 22 / 0.08);
 
   --animate-rise: rise 0.35s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-pop: pop 0.32s cubic-bezier(0.3, 1.6, 0.5, 1);
 }
 
 html {
@@ -80,6 +82,12 @@ body {
   from {
     opacity: 0;
     transform: translateY(6px);
+  }
+}
+
+@keyframes pop {
+  40% {
+    transform: scale(1.25);
   }
 }
 

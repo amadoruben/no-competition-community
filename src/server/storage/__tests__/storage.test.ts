@@ -12,7 +12,8 @@ import { setStorage } from "../index";
 import { LocalStorageProvider } from "../local";
 import type { StorageProvider } from "../types";
 
-const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
+/** PNG signature and IHDR (1×1): enough for type and size checks; no pixels are decoded. */
+const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52, 0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0, 0, 0, 0, 0, 0, 0]);
 
 describe("LocalStorageProvider", () => {
   it("stores, reads and deletes, and refuses path traversal", async () => {

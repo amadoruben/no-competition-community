@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { INVESTOR, loginAs, MEMBER } from "./helpers";
+import { INVESTOR, loginAs, MEMBER, png, postCard, postMenu, publish } from "./helpers";
 
 const COLLECTION = `Bastidores E2E ${Date.now()}`;
 const VIDEO = "Episódio exclusivo E2E";
@@ -49,10 +49,7 @@ test("Início: members post, the admin moderates, the profile shows the activity
   const title = `Olá comunidade ${Date.now()}`;
   const mem = await loginAs(browser, MEMBER);
   await mem.goto("/dashboard");
-  await mem.getByRole("button", { name: /Escreva algo para a comunidade/ }).click();
-  await mem.getByLabel("Título").fill(title);
-  await mem.getByLabel("Texto").fill("Sou novo por aqui e estou a construir um projecto de energia.");
-  await mem.getByRole("button", { name: "Publicar" }).click();
+  await publish(mem, { title, body: "Sou novo por aqui e estou a construir um projecto de energia." });
   await expect(mem.getByRole("link", { name: title })).toBeVisible();
 
   await mem.getByRole("navigation", { name: "Principal" }).getByRole("link", { name: "Perfil" }).click();
@@ -61,8 +58,7 @@ test("Início: members post, the admin moderates, the profile shows the activity
 
   const inv = await loginAs(browser, INVESTOR);
   await inv.goto("/dashboard");
-  const card = inv.locator("article", { has: inv.getByRole("link", { name: title }) });
-  await card.getByRole("button", { name: "Remover publicação" }).click();
+  await postMenu(postCard(inv, title), "Remover publicação");
   await inv.getByRole("dialog").getByRole("button", { name: "Remover" }).click();
   await expect(inv.getByRole("link", { name: title })).toHaveCount(0);
 
@@ -74,27 +70,88 @@ test("first content: the admin's welcome announcement is pinned and official for
   const title = `Bem-vindos à comunidade ${Date.now()}`;
   const inv = await loginAs(browser, INVESTOR);
   await inv.goto("/dashboard");
-  await inv.getByRole("button", { name: /Escreva algo para a comunidade/ }).click();
-  await inv.getByLabel("Tipo").selectOption("announcement");
-  await inv.getByLabel("Título").fill(title);
-  await inv.getByLabel("Texto").fill("Esta é a comunidade oficial da No Competition.");
-  await inv.getByRole("button", { name: "Publicar" }).click();
+  await publish(inv, { kind: "Anúncio oficial", title, body: "Esta é a comunidade oficial da No Competition." });
   await expect(inv.getByRole("link", { name: title })).toBeVisible();
 
   const mem = await loginAs(browser, MEMBER);
   await mem.goto("/dashboard?f=announcement");
-  const first = mem.getByRole("link", { name: title });
-  await expect(first).toBeVisible();
-  const card = mem.locator("article", { has: first });
-  await expect(card.getByText("No Competition", { exact: true })).toBeVisible();
-  await expect(card.getByText("Fixado")).toBeVisible();
-  // Members never get the "official announcement" option.
-  await mem.getByRole("button", { name: /Escreva algo para a comunidade/ }).click();
-  await expect(mem.getByLabel("Tipo").locator('option[value="announcement"]')).toHaveCount(0);
+  const card = postCard(mem, title);
+  await expect(card).toBeVisible();
+  await expect(card.getByRole("img", { name: "Conta oficial No Competition" })).toBeVisible();
+  await expect(card.getByText("Anúncio oficial", { exact: true })).toBeVisible();
+  await expect(card.getByText("Fixado", { exact: true })).toBeVisible();
+  // Pinned: first in the community feed.
+  await mem.goto("/dashboard");
+  await expect(mem.locator("article").first()).toHaveAccessibleName(title);
+  // Members never get the "official announcement" option, nor moderation.
+  await mem.getByRole("button", { name: "Partilhe algo com a comunidade…" }).click();
+  await expect(mem.locator("#publicar").getByRole("radio", { name: "Anúncio oficial" })).toHaveCount(0);
+  await postCard(mem, title).getByRole("button", { name: "Mais acções" }).click();
+  await expect(mem.getByRole("menuitem", { name: "Remover publicação" })).toHaveCount(0);
+  await expect(mem.getByRole("menuitem", { name: "Copiar link" })).toBeVisible();
 
   await inv.goto("/dashboard");
-  const own = inv.locator("article", { has: inv.getByRole("link", { name: title }) });
-  await own.getByRole("button", { name: "Remover publicação" }).click();
+  await postMenu(postCard(inv, title), "Remover publicação");
   await inv.getByRole("dialog").getByRole("button", { name: "Remover" }).click();
   await expect(inv.getByRole("link", { name: title })).toHaveCount(0);
+});
+
+test("feed: photos, reactions, saved posts and replies persist", async ({ browser }) => {
+  const title = `Primeiro protótipo ${Date.now()}`;
+  const mem = await loginAs(browser, MEMBER);
+  await mem.goto("/dashboard");
+  await publish(mem, {
+    title,
+    kind: "Progresso",
+    body: "Montámos o sensor na loja piloto. Mais em https://example.com/piloto",
+    photos: [
+      { name: "a.png", mimeType: "image/png", buffer: png(120, 150) },
+      { name: "b.png", mimeType: "image/png", buffer: png(160, 90, [40, 40, 40]) },
+    ],
+  });
+  const card = postCard(mem, title);
+  await expect(card.getByRole("group", { name: /2 fotografias/ })).toBeVisible();
+  // The photos are served (signed-in only) and decode in the browser.
+  const first = card.getByRole("img", { name: /fotografia 1 de 2/ });
+  await expect(first).toHaveAttribute("src", /^\/files\//);
+  await expect.poll(() => first.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth)).toBeGreaterThan(0);
+  await expect(card.getByRole("link", { name: "example.com/piloto" })).toHaveAttribute("rel", /noopener/);
+
+  // React and save, then reload: both persist.
+  const other = await loginAs(browser, INVESTOR);
+  await other.goto("/dashboard");
+  const seen = postCard(other, title);
+  await seen.getByRole("button", { name: "Gosto" }).click();
+  await expect(seen.getByRole("button", { name: "Retirar gosto" })).toHaveAttribute("aria-pressed", "true");
+  await expect(seen.getByText("1 gosto")).toBeVisible();
+  await seen.getByRole("button", { name: "Guardar" }).click();
+  await expect(seen.getByRole("button", { name: "Remover dos guardados" })).toBeVisible();
+  await other.reload();
+  await expect(postCard(other, title).getByRole("button", { name: "Retirar gosto" })).toBeVisible();
+  await expect(postCard(other, title).getByText("1 gosto")).toBeVisible();
+  await other.goto("/dashboard?f=saved");
+  await expect(postCard(other, title)).toBeVisible();
+  // Saved posts are private: the author's saved list does not have it.
+  await mem.goto("/dashboard?f=saved");
+  await expect(mem.getByRole("link", { name: title })).toHaveCount(0);
+
+  // Comment inline, then reply on the post page.
+  await other.goto("/dashboard");
+  await postCard(other, title).getByLabel("Escrever um comentário").fill("Que poupança mediram?");
+  await postCard(other, title).getByRole("button", { name: "Publicar comentário" }).click();
+  await expect(postCard(other, title).getByText("Que poupança mediram?")).toBeVisible();
+  await mem.goto("/dashboard");
+  await postCard(mem, title).getByRole("link", { name: title }).click();
+  await mem.getByRole("button", { name: "Responder" }).click();
+  await mem.getByLabel(/Responder a/).fill("Cerca de 18% no primeiro mês.");
+  await mem.getByRole("button", { name: "Responder", exact: true }).last().click();
+  await expect(mem.getByRole("heading", { name: "2 comentários" })).toBeVisible();
+  await mem.reload();
+  await expect(mem.getByText("Cerca de 18% no primeiro mês.")).toBeVisible();
+
+  // The author removes the post (and its photos).
+  await postMenu(mem.locator("article").first(), "Remover publicação");
+  await mem.getByRole("dialog").getByRole("button", { name: "Remover" }).click();
+  await expect(mem).toHaveURL(/\/dashboard$/);
+  await expect(mem.getByRole("link", { name: title })).toHaveCount(0);
 });

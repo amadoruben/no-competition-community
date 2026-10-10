@@ -8,7 +8,7 @@ import type { ActionState } from "@/lib/action-state";
 import { deleteAccount, emailSchema, passwordSchema, resolveUser, validateRegistration } from "@/server/accounts";
 import { auth, AuthError } from "@/server/auth";
 import { createChallenge, setChallengeStatus, setEvaluator, updateChallenge } from "@/server/challenges";
-import { addComment, createPost, deletePost, setPinned, toggleReaction } from "@/server/community";
+import { addComment, createPost, deleteComment, deletePost, setPinned, toggleReaction, toggleSaved, updatePost } from "@/server/community";
 import { DomainError, invalid } from "@/server/errors";
 import { UNAVAILABLE_MESSAGE, isInfraUnavailable } from "@/server/infra-errors";
 import { addVideo, createCollection, deleteCollection, deleteVideo, setCollectionAccess, setLessonComplete } from "@/server/learning";
@@ -371,23 +371,48 @@ export async function updateProfileAction(_: ActionState, fd: FormData): Promise
 
 export async function createPostAction(_: ActionState, fd: FormData): Promise<ActionState> {
   const u = await actor();
+  const images = fd.getAll("images").filter((f) => f instanceof Blob && f.size > 0);
   return attempt(
-    () => createPost(u, { kind: str(fd, "kind") || "discussion", title: str(fd, "title"), body: str(fd, "body"), challengeId: optStr(fd, "challengeId"), projectId: optStr(fd, "projectId") }),
+    () =>
+      createPost(
+        u,
+        { kind: str(fd, "kind") || "discussion", title: str(fd, "title"), body: str(fd, "body"), videoUrl: str(fd, "videoUrl"), challengeId: optStr(fd, "challengeId"), projectId: optStr(fd, "projectId") },
+        images,
+      ),
     "Publicado.",
   );
 }
 
-export async function commentAction(postId: string, _: ActionState, fd: FormData): Promise<ActionState> {
+export async function updatePostAction(postId: string, _: ActionState, fd: FormData): Promise<ActionState> {
   const u = await actor();
-  return attempt(() => addComment(u, postId, str(fd, "body")), "Comentário publicado.");
+  return attempt(() => updatePost(u, postId, { kind: str(fd, "kind"), title: str(fd, "title"), body: str(fd, "body") }), "Publicação actualizada.");
 }
 
-/** Returns the persisted state so optimistic UI can reconcile (or roll back on failure). */
-export async function reactAction(postId: string): Promise<{ ok: boolean; active?: boolean; error?: string }> {
+export async function commentAction(postId: string, _: ActionState, fd: FormData): Promise<ActionState> {
+  const u = await actor();
+  return attempt(() => addComment(u, postId, str(fd, "body"), optStr(fd, "parentId")), "Comentário publicado.");
+}
+
+export async function deleteCommentAction(commentId: string) {
+  const u = await actor();
+  return attempt(() => deleteComment(u, commentId), "Comentário removido.");
+}
+
+/** Returns the persisted state and the real count so optimistic UI can reconcile (or roll back on failure). */
+export async function reactAction(postId: string): Promise<{ ok: boolean; active?: boolean; count?: number; error?: string }> {
+  const u = await actor();
+  let state: { active: boolean; count: number } | undefined;
+  const r = await attempt(async () => {
+    state = await toggleReaction(u, postId);
+  });
+  return r.ok && state ? { ok: true, ...state } : { ok: false, error: r.error };
+}
+
+export async function saveAction(postId: string): Promise<{ ok: boolean; active?: boolean; error?: string }> {
   const u = await actor();
   let active = false;
   const r = await attempt(async () => {
-    active = await toggleReaction(u, postId);
+    active = await toggleSaved(u, postId);
   });
   return r.ok ? { ok: true, active } : { ok: false, error: r.error };
 }

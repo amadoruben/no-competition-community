@@ -39,9 +39,16 @@ Depois de 1–5, e com os testes reais da Preview verdes:
 - Em Production, `OWNER_EMAILS` já está definido: entrar com o email do dono, confirmado, dá o papel de administração.
 
 ## Conteúdo inicial (administração, depois de entrar)
-1. **Início → Escreva algo… → Tipo: Anúncio oficial**: a mensagem de boas-vindas fica fixada no topo para todos.
+1. **Início → Partilhe algo com a comunidade… → Anúncio oficial**: a mensagem de boas-vindas fica fixada no topo para todos (com fotografias, se quiser).
 2. **Administração → Gerir vídeos**: criar uma colecção (aberta ou exclusiva) e colar o link do primeiro vídeo (YouTube, incluindo "não listado", Vimeo ou `.mp4`).
 3. **Administração → Novo desafio**: tema, regras, datas, critérios com pesos e prémios → guardar (rascunho) → **Publicar**.
 4. **Membros e acessos**: nomear avaliadores e atribuí-los ao desafio; dar acesso completo a quem deve ver as colecções exclusivas.
 
 Estes quatro fluxos estão cobertos por testes automáticos (`e2e/community.spec.ts`, `e2e/challenge-lifecycle.spec.ts`, `e2e/roles.spec.ts`).
+
+## Feed da comunidade: o que existe e o que não existe
+- **Publicar:** texto com links, título opcional, até 6 fotografias (redimensionadas no dispositivo para 1600 px e verificadas no servidor: tipo, tamanho e dimensões) **ou** um vídeo por link (YouTube, Vimeo ou ficheiro `.mp4` https). Tipos: Conversa, Pergunta, Progresso; Anúncio oficial só para a administração, fixado no topo.
+- **Interagir:** gosto (um por pessoa; tocar de novo retira), comentários com respostas (um nível), guardar (privado), partilhar (folha de partilha do dispositivo ou link copiado; o link só abre com sessão iniciada), menu "⋯" com as acções permitidas (copiar link, editar o próprio texto, fixar, remover).
+- **Isolamento:** contas de demonstração e contas reais nunca vêem as publicações umas das outras.
+- **Não existe (decisão consciente):** carregar ficheiros de vídeo. Um pedido na Vercel aceita no máximo 4,5 MB; vídeos exigiriam envio directo para o Storage com URLs assinados, limites por plano e eventualmente processamento — fica para quando houver necessidade e orçamento. Também não há notificações nem vários tipos de reacção (o modelo permite acrescentá-los).
+- **Base de dados:** a migração `0004_feed_media_replies_saved` é só aditiva (tabelas `post_media` e `saved_posts`, colunas novas em `posts` e `comments`, RLS nas tabelas novas). O código anterior continua a funcionar com ela.

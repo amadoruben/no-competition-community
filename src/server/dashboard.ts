@@ -1,4 +1,4 @@
-import { count, desc, eq, inArray } from "drizzle-orm";
+import { and, count, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { lessonProgress, posts, projectUpdates, users, type User } from "@/db/schema";
 import { challengePhase } from "@/lib/challenge-state";
@@ -74,8 +74,16 @@ export async function memberDashboard(user: User) {
   };
 }
 
-/** Real figures for the community header (demo and real accounts counted apart). */
+/** Real figures for the community header and the team behind it (demo and real accounts kept apart). */
 export async function communityStats(viewer: User) {
-  const [m] = await db.select({ n: count() }).from(users).where(eq(users.isDemo, viewer.isDemo));
-  return { members: m.n };
+  const [[m], team] = await Promise.all([
+    db.select({ n: count() }).from(users).where(eq(users.isDemo, viewer.isDemo)),
+    db
+      .select({ id: users.id, name: users.name, handle: users.handle, headline: users.headline, avatarHue: users.avatarHue, avatarFileId: users.avatarFileId })
+      .from(users)
+      .where(and(eq(users.isDemo, viewer.isDemo), eq(users.role, "investor")))
+      .orderBy(users.createdAt)
+      .limit(4),
+  ]);
+  return { members: m.n, team };
 }

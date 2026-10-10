@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { spawn, execSync, type ChildProcess } from "node:child_process";
-import { INVESTOR, MEMBER, loginAs } from "./helpers";
+import { INVESTOR, loginAs, MEMBER, publish } from "./helpers";
 
 /**
  * Persistence across restarts and behaviour while the database is down.
@@ -56,10 +56,7 @@ test("data persists across an application restart", async ({ browser }) => {
   const title = `Persistência ${Date.now().toString(36)}`;
   const mem = await loginAs(browser, MEMBER);
   await mem.goto("/community");
-  await mem.getByRole("button", { name: /Partilhe uma pergunta/ }).click();
-  await mem.locator('input[name="title"]').fill(title);
-  await mem.locator('textarea[name="body"]').fill("Escrito antes do reinício do servidor.");
-  await mem.getByRole("button", { name: "Publicar" }).click();
+  await publish(mem, { title, body: "Escrito antes do reinício do servidor." });
   await expect(mem.getByText("Publicado.")).toBeVisible();
 
   stopServer();
@@ -73,9 +70,9 @@ test("data persists across an application restart", async ({ browser }) => {
 test("database outage: honest errors, no false confirmations, automatic recovery", async ({ browser }) => {
   const inv = await loginAs(browser, INVESTOR);
   await inv.goto("/community");
-  await inv.getByRole("button", { name: /Partilhe uma pergunta/ }).click();
-  await inv.locator('input[name="title"]').fill("Durante a falha");
-  await inv.locator('textarea[name="body"]').fill("Isto não deve ser guardado.");
+  await inv.getByRole("button", { name: "Partilhe algo com a comunidade…" }).click();
+  await inv.locator("#publicar").getByLabel("Título (opcional)").fill("Durante a falha");
+  await inv.locator("#publicar").getByLabel("Texto da publicação").fill("Isto não deve ser guardado.");
 
   execSync(STOP!, { stdio: "ignore" });
   try {
@@ -83,7 +80,7 @@ test("database outage: honest errors, no false confirmations, automatic recovery
     expect(health.status).toBe(503);
     expect((await health.json()).checks.database.ok).toBe(false);
 
-    await inv.getByRole("button", { name: "Publicar" }).click();
+    await inv.locator("#publicar").getByRole("button", { name: "Publicar", exact: true }).click();
     await expect(inv.getByText(/temporariamente indisponível|A operação não foi guardada/).first()).toBeVisible({ timeout: 30_000 });
     await expect(inv.getByText("Publicado.")).toHaveCount(0);
 
