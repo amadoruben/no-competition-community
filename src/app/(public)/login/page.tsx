@@ -3,11 +3,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { demoLoginAction } from "@/app/actions";
+import { auth } from "@/server/auth";
 import { demoMode } from "@/server/config";
 import { currentUser, homeFor } from "@/server/session";
 import { Notice } from "@/components/ui";
 import { AuthShell } from "../auth-shell";
 import { LoginForm } from "./login-form";
+import { ResendConfirmation } from "./resend-confirmation";
 
 export const metadata: Metadata = { title: "Entrar" };
 
@@ -22,6 +24,7 @@ export default async function LoginPage(props: PageProps<"/login">) {
   if (user) redirect(homeFor(user));
   const sp = await props.searchParams;
   const demo = demoMode();
+  const canResend = !!auth().resendConfirmation;
   return (
     <AuthShell
       title="Bem-vindo de volta"
@@ -38,7 +41,8 @@ export default async function LoginPage(props: PageProps<"/login">) {
         )
       }
     >
-      {sp.confirm && <Notice tone="ok" className="mb-6">Conta criada. Confirme o seu email para entrar.</Notice>}
+      {sp.confirm && <Notice tone="ok" className="mb-6">Enviámos um link de confirmação para o seu email. Abra-o para activar a conta e entrar.</Notice>}
+      {sp.deleted && <Notice tone="ok" className="mb-6">A sua conta foi eliminada.</Notice>}
       {sp.error === "link" && <Notice tone="bad" className="mb-6">O link expirou ou já foi utilizado. Entre com a sua palavra-passe ou peça um novo link.</Notice>}
       {sp.error === "demo" && <Notice tone="bad" className="mb-6">Não foi possível entrar com a conta de demonstração. Tente novamente.</Notice>}
       {demo && (
@@ -76,6 +80,7 @@ export default async function LoginPage(props: PageProps<"/login">) {
           Esqueceu-se da palavra-passe?
         </Link>
       </p>
+      {canResend && <ResendConfirmation open={!!sp.confirm} />}
       <p className="mt-6 text-center text-sm text-muted">
         Ainda não tem conta?{" "}
         <Link href="/register" className="font-medium text-ink underline underline-offset-4">

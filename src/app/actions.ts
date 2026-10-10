@@ -5,7 +5,7 @@ import { headers } from "next/headers";
 import { redirect, unstable_rethrow } from "next/navigation";
 import { z } from "zod";
 import type { ActionState } from "@/lib/action-state";
-import { emailSchema, passwordSchema, resolveUser, validateRegistration } from "@/server/accounts";
+import { deleteAccount, emailSchema, passwordSchema, resolveUser, validateRegistration } from "@/server/accounts";
 import { auth, AuthError } from "@/server/auth";
 import { createChallenge, setChallengeStatus, setEvaluator, updateChallenge } from "@/server/challenges";
 import { addComment, createPost, setPinned, toggleReaction } from "@/server/community";
@@ -113,15 +113,34 @@ export async function registerAction(_: ActionState, fd: FormData): Promise<Acti
   const r = await attempt(async () => {
     const v = await validateRegistration({ name: str(fd, "name"), email: str(fd, "email"), password: str(fd, "password") });
     steps.validated = Date.now() - t0;
-    const { identity, needsEmailConfirmation } = await auth().signUp(v.email, v.password, { confirmRedirect: `${await origin()}/auth/callback` });
+    const { identity, needsEmailConfirmation } = await auth().signUp(v.email, v.password, { confirmRedirect: `${await origin()}/auth/callback`, name: v.name });
     steps.signedUp = Date.now() - t0;
-    await resolveUser(identity, v.name);
-    steps.profile = Date.now() - t0;
+    // With email confirmation the profile is created when the link is opened
+    // (/auth/callback, name kept by the provider): an unconfirmed sign-up
+    // leaves no application data and can simply register or resend again.
     if (needsEmailConfirmation) dest = "/login?confirm=1";
+    else {
+      await resolveUser(identity, v.name);
+      steps.profile = Date.now() - t0;
+    }
   });
   logger.info("auth.register", { ok: r.ok, steps, totalMs: Date.now() - t0, ...(r.ok ? { confirm: dest.startsWith("/login") } : { error: r.error }) });
   if (!r.ok) return r;
   redirect(dest);
+}
+
+export async function resendConfirmationAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  return attempt(async () => {
+    const email = parse(z.object({ email: emailSchema }), { email: str(fd, "email") }).email;
+    await auth().resendConfirmation?.(email, `${await origin()}/auth/callback`);
+  }, "Se existir uma conta por confirmar com este email, enviámos um novo link de confirmação.");
+}
+
+export async function deleteAccountAction(_: ActionState, fd: FormData): Promise<ActionState> {
+  const u = await actor();
+  const r = await attempt(() => deleteAccount(u, str(fd, "confirm"), (subject) => auth().deleteIdentity(subject)));
+  if (!r.ok) return r;
+  redirect("/login?deleted=1");
 }
 
 export async function logoutAction() {

@@ -20,7 +20,8 @@
     "vercel-build": "tsx scripts/supabase-check.ts --build && tsx src/db/migrate-cli.ts --skip-if-unconfigured && tsx scripts/supabase-bootstrap.ts --skip-if-unconfigured && next build",
     "supabase:bootstrap": "tsx --env-file-if-exists=.env.local scripts/supabase-bootstrap.ts",
     "supabase:check": "tsx --env-file-if-exists=.env.local scripts/supabase-check.ts",
-    "user:role": "tsx --env-file-if-exists=.env.local scripts/user-role.ts"
+    "user:role": "tsx --env-file-if-exists=.env.local scripts/user-role.ts",
+    "supabase:auth-config": "tsx scripts/supabase-auth-config.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "0.5.8",

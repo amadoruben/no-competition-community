@@ -45,7 +45,8 @@ async function store(owner: User, prefix: string, file: unknown) {
   }
 }
 
-async function discard(fileId: string | null) {
+/** Remove a stored file (row and object). Object removal is best-effort and logged. */
+export async function discard(fileId: string | null) {
   if (!fileId) return;
   const [row] = await db.delete(files).where(eq(files.id, fileId)).returning();
   if (row) await storage().delete(row.storageKey).catch((e) => logger.warn("storage.delete_failed", { key: row.storageKey, error: e }));

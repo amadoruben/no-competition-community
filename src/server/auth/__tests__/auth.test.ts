@@ -166,3 +166,49 @@ describe("SupabaseAuthProvider sign-up: every outcome is a clear answer, never a
   });
 });
 
+describe("SupabaseAuthProvider: confirmation and account deletion", () => {
+  const calls: { method: string; path: string; body: unknown; auth: string | null }[] = [];
+  const json = (status: number, body: unknown) =>
+    new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "x-supabase-api-version": "2024-01-01" } });
+  const id = "2d1f7c1e-0f53-4a5b-9b7e-6c2a1d3e4f50";
+  const fakeFetch: typeof fetch = async (input, init) => {
+    const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
+    const headers = new Headers(init?.headers);
+    calls.push({ method: init?.method ?? "GET", path: url.pathname, body: init?.body ? JSON.parse(String(init.body)) : null, auth: headers.get("apikey") });
+    if (url.pathname === "/auth/v1/signup") {
+      const b = JSON.parse(String(init?.body));
+      return json(200, { id, email: b.email, aud: "authenticated", role: "authenticated", identities: [{ id: "1" }], user_metadata: b.data ?? {} });
+    }
+    if (url.pathname === "/auth/v1/resend") return json(200, {});
+    if (url.pathname === `/auth/v1/admin/users/${id}` && init?.method === "DELETE") return json(200, {});
+    return json(404, { msg: "not mocked" });
+  };
+  const sb = new SupabaseAuthProvider("https://project.supabase.test", "sb_publishable_test", fakeFetch, 1000);
+  beforeEach(() => {
+    jar.clear();
+    calls.length = 0;
+  });
+
+  it("keeps the name at the provider so the profile can be created after confirmation", async () => {
+    const r = await sb.signUp("nova@example.test", "a-good-password", { confirmRedirect: "https://app.test/auth/callback", name: "Nova Pessoa" });
+    expect(calls[0].body).toMatchObject({ data: { name: "Nova Pessoa" } });
+    expect(r).toEqual({ identity: { subject: id, email: "nova@example.test", name: "Nova Pessoa" }, needsEmailConfirmation: true });
+  });
+
+  it("resends the confirmation email", async () => {
+    await sb.resendConfirmation("nova@example.test", "https://app.test/auth/callback");
+    expect(calls[0]).toMatchObject({ method: "POST", path: "/auth/v1/resend", body: { type: "signup", email: "nova@example.test" } });
+  });
+
+  it("deletes the identity with the secret key (server only)", async () => {
+    vi.stubEnv("SUPABASE_SECRET_KEY", "sb_secret_test");
+    try {
+      await sb.deleteIdentity(id);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+    const del = calls.find((c) => c.method === "DELETE");
+    expect(del).toMatchObject({ path: `/auth/v1/admin/users/${id}`, auth: "sb_secret_test" });
+  });
+});
+

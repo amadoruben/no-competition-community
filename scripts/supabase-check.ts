@@ -21,7 +21,7 @@ import { sql } from "drizzle-orm";
 import { readMigrationFiles } from "drizzle-orm/migrator";
 import { randomBytes, randomUUID } from "node:crypto";
 import { openDatabase } from "../src/db";
-import { assertOwnDatabase } from "../src/db/guard";
+import { assertOwnDatabase, OWN_TABLES } from "../src/db/guard";
 import { MIGRATIONS_DIR } from "../src/db/migrate";
 import {
   analyseSupabaseEnv,
@@ -87,6 +87,65 @@ async function checkSessions(h: { db: Awaited<ReturnType<typeof openDatabase>>["
     }
   } catch (e) {
     report("warn", `Sessions: not visible to this role — ${reason(e)}`);
+  }
+}
+
+/** Every application table must have row-level security on (no policies = no access through the Data API). */
+async function checkRls(h: { db: Awaited<ReturnType<typeof openDatabase>>["db"] }) {
+  try {
+    const res = await h.db.execute(sql`
+      select c.relname as t, c.relrowsecurity as rls from pg_class c join pg_namespace n on n.oid = c.relnamespace
+      where n.nspname = 'public' and c.relkind in ('r', 'p')`);
+    const rows = (Array.isArray(res) ? res : (res as unknown as { rows: unknown[] }).rows) as { t: string; rls: boolean }[];
+    const off = rows.filter((r) => !r.rls).map((r) => r.t);
+    if (off.length) report("error", `Row-level security is OFF on: ${off.join(", ")} — run the migrations (0001 enables it)`);
+    else report("ok", `Row-level security on all ${rows.length} public tables`);
+    // Files are served only through the app (secret key + signed URLs): no storage
+    // policy may let browser roles (anon, authenticated) touch objects directly.
+    const st = await h.db.execute(sql`
+      select exists (select 1 from pg_namespace where nspname = 'storage') as has,
+             coalesce((select string_agg(policyname || ' (' || array_to_string(roles, ',') || ' ' || cmd || ')', '; ')
+                       from pg_policies where schemaname = 'storage' and tablename = 'objects'
+                       and (roles && array['anon', 'authenticated', 'public']::name[])), '') as open`);
+    const s0 = ((Array.isArray(st) ? st : (st as unknown as { rows: unknown[] }).rows) as { has: boolean; open: string }[])[0];
+    if (s0?.has) report(s0.open ? "warn" : "ok", s0.open ? `Storage policies open to browser roles: ${s0.open} — review that they cannot reach the app's bucket` : "Storage: no policy gives browser roles access to stored files");
+  } catch (e) {
+    report("warn", `RLS check failed — ${reason(e)}`);
+  }
+}
+
+/**
+ * What an anonymous visitor can reach with the public (publishable) key, which
+ * any browser can read: nothing. Read-only requests; no data is changed.
+ */
+async function checkAnonymousExposure(url: string, pub: string, bucket: string) {
+  const headers = { apikey: pub };
+  const leaking: string[] = [];
+  for (const table of [...OWN_TABLES].sort()) {
+    try {
+      const res = await fetch(`${url}/rest/v1/${table}?select=*&limit=1`, { headers, signal: AbortSignal.timeout(10_000) });
+      // 200 [] = RLS without policies; 401/403/404 = not exposed or no grant. Rows = leak.
+      if (res.ok && ((await res.json()) as unknown[]).length) leaking.push(table);
+    } catch (e) {
+      report("warn", `Data API check for ${table} failed — ${reason(e)}`);
+    }
+  }
+  if (leaking.length) report("error", `The public key can READ rows from: ${leaking.join(", ")}`);
+  else report("ok", `Data API: the public key reads no rows from any of the ${OWN_TABLES.size} application tables`);
+
+  try {
+    const list = await fetch(`${url}/storage/v1/object/list/${bucket}`, {
+      method: "POST",
+      headers: { ...headers, "content-type": "application/json" },
+      body: JSON.stringify({ prefix: "", limit: 1 }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    // Whether the bucket itself is public is checked below with the secret key.
+    const listed = list.ok ? ((await list.json()) as unknown[]).length : 0;
+    if (listed) report("error", `Storage: the public key can LIST files in "${bucket}"`);
+    else report("ok", `Storage: the public key cannot list files in "${bucket}" (HTTP ${list.status})`);
+  } catch (e) {
+    report("warn", `Storage exposure check failed — ${reason(e)}`);
   }
 }
 
@@ -202,6 +261,7 @@ async function main() {
       report("error", reason(e));
     }
     await checkSessions(h);
+    await checkRls(h);
   }
   if (run && run !== mig) await run.close();
   await mig?.close();
@@ -231,6 +291,7 @@ async function main() {
 
   console.log("\n4. Storage");
   const bucket = env.STORAGE_BUCKET ?? "ncc-files";
+  await checkAnonymousExposure(url, pub, bucket);
   if (!secret) report("warn", "Skipped (no secret key)");
   else {
     const admin = createClient(url, secret, { auth: { persistSession: false, autoRefreshToken: false } });

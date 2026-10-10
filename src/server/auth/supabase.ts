@@ -57,23 +57,44 @@ export class SupabaseAuthProvider implements AuthProvider {
   async signIn(email: string, password: string): Promise<AuthIdentity> {
     const { data, error } = await (await this.client()).auth.signInWithPassword({ email, password });
     if (error || !data.user) {
-      if (error?.code === "email_not_confirmed") throw new AuthError("Confirme o seu email antes de entrar.", "unconfirmed");
+      if (error?.code === "email_not_confirmed") throw new AuthError("Confirme o seu email antes de entrar. Se não o encontrar, peça um novo abaixo.", "unconfirmed");
       throw providerError("signIn", error) ?? new AuthError("Email ou palavra-passe incorrectos.");
     }
-    return { subject: data.user.id, email: data.user.email! };
+    return identityOf(data.user);
   }
 
-  async signUp(email: string, password: string, opts?: { confirmRedirect?: string }) {
+  async signUp(email: string, password: string, opts?: { confirmRedirect?: string; name?: string }) {
     const { data, error } = await (await this.client()).auth.signUp({
       email,
       password,
-      options: opts?.confirmRedirect ? { emailRedirectTo: opts.confirmRedirect } : undefined,
+      options: {
+        ...(opts?.confirmRedirect ? { emailRedirectTo: opts.confirmRedirect } : {}),
+        // Kept by Supabase so the profile can be created with it after confirmation.
+        ...(opts?.name ? { data: { name: opts.name } } : {}),
+      },
     });
     if (error || !data.user) throw signUpError(error);
     // With email confirmation on, Supabase answers a sign-up for an existing
     // address with a placeholder user that has no identities (no enumeration).
     if (data.user.identities?.length === 0) throw new AuthError(EXISTS, "exists");
-    return { identity: { subject: data.user.id, email: data.user.email! }, needsEmailConfirmation: !data.session };
+    return { identity: identityOf(data.user), needsEmailConfirmation: !data.session };
+  }
+
+  async resendConfirmation(email: string, confirmRedirect: string) {
+    // Supabase answers success for unknown or already-confirmed addresses (no enumeration).
+    const { error } = await (await this.client()).auth.resend({ type: "signup", email, options: { emailRedirectTo: confirmRedirect } });
+    const e = providerError("resendConfirmation", error);
+    if (e) throw e;
+  }
+
+  async deleteIdentity(subject: string) {
+    const { error } = await this.admin().auth.admin.deleteUser(subject);
+    if (error && error.status !== 404) throw providerError("deleteIdentity", error) ?? new AuthError("Não foi possível eliminar a identidade.", "unavailable");
+    try {
+      await (await this.client()).auth.signOut({ scope: "local" });
+    } catch {
+      // Session cookies are cleared best-effort; the identity no longer exists.
+    }
   }
 
   async exchangeCallback(link: EmailLink): Promise<AuthIdentity> {
@@ -82,7 +103,7 @@ export class SupabaseAuthProvider implements AuthProvider {
       ? await sb.auth.verifyOtp({ token_hash: link.tokenHash, type: (link.type ?? "email") as "email" | "signup" | "invite" | "magiclink" | "email_change" })
       : await sb.auth.exchangeCodeForSession(link.code ?? "");
     if (error || !data.user) throw providerError("exchangeCallback", error) ?? new AuthError(LINK_FAILED);
-    return { subject: data.user.id, email: data.user.email! };
+    return identityOf(data.user);
   }
 
   async currentIdentity(): Promise<AuthIdentity | null> {
@@ -181,6 +202,11 @@ function signUpError(e: ProviderError): AuthError {
   if (other) return other;
   logger.warn("auth.provider_error", { op: "signUp", status: e?.status, code, message: e?.message });
   return new AuthError("Não foi possível criar a conta. Verifique os dados e tente novamente.");
+}
+
+function identityOf(u: { id: string; email?: string; user_metadata?: Record<string, unknown> }): AuthIdentity {
+  const name = typeof u.user_metadata?.name === "string" ? u.user_metadata.name.trim() : "";
+  return { subject: u.id, email: u.email!, ...(name ? { name } : {}) };
 }
 
 function required(name: string, v: string | undefined) {

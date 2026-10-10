@@ -5,7 +5,8 @@ import { users, type User } from "@/db/schema";
 import { slugify } from "@/lib/slug";
 import type { AuthIdentity } from "./auth/types";
 import { PASSWORD_MIN } from "./auth/passwords";
-import { conflict } from "./errors";
+import { conflict, forbidden, invalid } from "./errors";
+import { discard } from "./files";
 import { logger } from "./logger";
 import { parse, text } from "./validation";
 
@@ -28,7 +29,7 @@ export async function resolveUser(identity: AuthIdentity, nameHint?: string): Pr
     logger.info("auth.linked", { userId: linked.id });
     return linked;
   }
-  const name = nameHint ?? identity.email.split("@")[0];
+  const name = nameHint ?? identity.name ?? identity.email.split("@")[0];
   return createMemberProfile(name, identity);
 }
 
@@ -49,6 +50,58 @@ export async function validateRegistration(input: unknown) {
   if ((await db.select({ id: users.id }).from(users).where(eq(users.email, v.email)).limit(1)).length)
     throw conflict("Já existe uma conta com este email.");
   return v;
+}
+
+/**
+ * Self-service account erasure (GDPR art. 17). Removes the profile, what only
+ * belongs to it (posts, comments, reactions, enrolments, lesson progress — ON
+ * DELETE CASCADE), the avatar and the identity at the auth provider.
+ *
+ * Refused while the account owns records other people depend on (projects,
+ * submissions, evaluations, challenges, results, decisions): the database's
+ * foreign keys decide, so nothing is ever left dangling.
+ *
+ * Order: (1) the deletion is tried in a transaction that is always rolled back,
+ * so a refusal changes nothing; (2) the identity is removed — if the provider
+ * fails, the profile is intact and the user can retry; (3) the profile is
+ * deleted. The provider call never runs inside a transaction (it may use the
+ * database itself, and holding a connection while waiting on it can deadlock
+ * a small pool).
+ */
+export async function deleteAccount(user: User, confirmEmail: string, deleteIdentity: (subject: string) => Promise<void>) {
+  if (user.isDemo) throw forbidden("As contas de demonstração não podem ser eliminadas.");
+  if (confirmEmail.trim().toLowerCase() !== user.email.toLowerCase())
+    throw invalid("Escreva o email da sua conta para confirmar.", { confirm: "O email não coincide com o da sua conta." });
+
+  const dryRun = Symbol("dry-run");
+  try {
+    await db.transaction(async (tx) => {
+      await tx.delete(users).where(eq(users.id, user.id));
+      throw dryRun;
+    });
+  } catch (e) {
+    if (e !== dryRun) {
+      if (sqlState(e) === "23503")
+        throw conflict("A sua conta tem projectos, submissões, avaliações ou desafios associados e não pode ser eliminada automaticamente. Contacte-nos para a eliminar.");
+      throw e;
+    }
+  }
+
+  if (user.authSubject) await deleteIdentity(user.authSubject);
+  try {
+    await db.delete(users).where(eq(users.id, user.id));
+  } catch (e) {
+    // Only if work was attached between the check and now: the identity is gone, the profile stays for an operator.
+    logger.error("account.delete_incomplete", { userId: user.id, error: e });
+    throw e;
+  }
+  await discard(user.avatarFileId);
+  logger.info("account.deleted", { userId: user.id });
+}
+
+function sqlState(e: unknown): string | undefined {
+  for (let cur = e as { code?: unknown; cause?: unknown } | undefined, i = 0; cur && i < 5; cur = cur.cause as typeof cur, i++)
+    if (typeof cur.code === "string" && /^[0-9A-Z]{5}$/.test(cur.code)) return cur.code;
 }
 
 export async function userBySubject(subject: string) {

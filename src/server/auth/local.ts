@@ -69,6 +69,12 @@ export class LocalAuthProvider implements AuthProvider {
     return { subject: row.subject, email: row.email };
   }
 
+  async deleteIdentity(subject: string) {
+    // Sessions and reset tokens go with the credentials (ON DELETE CASCADE).
+    await db.delete(credentials).where(eq(credentials.subject, subject));
+    (await cookies()).delete(COOKIE);
+  }
+
   async signOut() {
     const jar = await cookies();
     const token = jar.get(COOKIE)?.value;

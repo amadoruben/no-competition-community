@@ -124,9 +124,9 @@ export function useFormState() {
   return useContext(FormCtx);
 }
 
-export function FormMessage({ className }: { className?: string }) {
+export function FormMessage({ className, showSuccess }: { className?: string; showSuccess?: boolean }) {
   const { state } = useFormState();
-  if (!state || state.ok) return null;
+  if (!state || (state.ok && !(showSuccess && state.message))) return null;
   return (
     <p
       role={state.ok ? "status" : "alert"}
@@ -164,12 +164,15 @@ const control =
 
 export function Field({
   name,
+  id = name,
   label,
   hint,
   children,
   className,
 }: {
   name: string;
+  /** DOM id of the control, when the same field name appears twice on a page. */
+  id?: string;
   label: ReactNode;
   hint?: ReactNode;
   children: ReactNode;
@@ -179,12 +182,12 @@ export function Field({
   const error = state?.fieldErrors?.[name];
   return (
     <div className={clsx("space-y-1.5", className)}>
-      <label htmlFor={name} className="block text-[13px] font-medium text-ink">
+      <label htmlFor={id} className="block text-[13px] font-medium text-ink">
         {label}
       </label>
       {children}
       {error ? (
-        <p id={`${name}-error`} className="text-[13px] text-bad">
+        <p id={`${id}-error`} className="text-[13px] text-bad">
           {error}
         </p>
       ) : (
@@ -194,14 +197,14 @@ export function Field({
   );
 }
 
-function useInvalid(name?: string) {
+function useInvalid(name?: string, id = name) {
   const { state } = useFormState();
   const err = name ? state?.fieldErrors?.[name] : undefined;
-  return err ? { "aria-invalid": true as const, "aria-describedby": `${name}-error` } : {};
+  return err ? { "aria-invalid": true as const, "aria-describedby": `${id}-error` } : {};
 }
 
 export function Input({ className, ...props }: ComponentProps<"input">) {
-  const inv = useInvalid(props.name);
+  const inv = useInvalid(props.name, props.id);
   return <input id={props.name} className={clsx(control, "h-11", className)} {...inv} {...props} />;
 }
 

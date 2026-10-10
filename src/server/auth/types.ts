@@ -10,6 +10,8 @@
 export interface AuthIdentity {
   subject: string;
   email: string;
+  /** Name given at sign-up, when the provider kept it (used to create the profile after email confirmation). */
+  name?: string;
 }
 
 export type SignUpResult = { identity: AuthIdentity; needsEmailConfirmation: boolean };
@@ -21,7 +23,9 @@ export interface AuthProvider {
   /** Verify credentials and start a session for the current request. */
   signIn(email: string, password: string): Promise<AuthIdentity>;
   /** Create an identity and, when possible, start a session. `confirmRedirect` is where email confirmation links land. */
-  signUp(email: string, password: string, opts?: { confirmRedirect?: string }): Promise<SignUpResult>;
+  signUp(email: string, password: string, opts?: { confirmRedirect?: string; name?: string }): Promise<SignUpResult>;
+  /** Send the sign-up confirmation email again. Optional: local auth has no confirmation step. */
+  resendConfirmation?(email: string, confirmRedirect: string): Promise<void>;
   /**
    * Finish an email link (sign-up confirmation). Either a PKCE `code` (works in the
    * browser that started the flow) or a `tokenHash` + `type` (works on any device).
@@ -37,6 +41,8 @@ export interface AuthProvider {
   completePasswordReset(input: { token: string; password: string }): Promise<AuthIdentity>;
   /** Server-side provisioning (seeding, invitations). */
   provisionIdentity(email: string, password: string): Promise<AuthIdentity>;
+  /** Remove the identity and its sessions (account deletion). Idempotent. */
+  deleteIdentity(subject: string): Promise<void>;
 }
 
 /**
