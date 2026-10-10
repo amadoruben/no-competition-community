@@ -33,11 +33,18 @@ describe("video library", () => {
     const c = await createCollection(admin, { title: "Masterclass", description: "Exclusivo.", accessTier: "full" });
     const v = await addVideo(admin, { courseId: c.id, title: "Aula secreta", videoUrl: YT, content: "Segredo", durationMin: 20 });
     const d = await getCourse(m, c.slug);
-    expect(d.locked).toBe(true);
-    expect(d.flat.every((l) => l.videoUrl === null && l.content === "")).toBe(true);
-    expect((await listCourses(m)).find((x) => x.id === c.id)!.thumbnail).toBeNull();
+    expect(d).toMatchObject({ locked: true, lessonCount: 1, minutes: 20, flat: [], outline: [] });
+    const listed = (await listCourses(m)).find((x) => x.id === c.id)!;
+    expect(listed).toMatchObject({ locked: true, thumbnail: null, videos: [] });
+    // Neither the title, the slug, the link nor the notes of the video reach the viewer.
+    for (const leaked of ["Aula secreta", v.slug, "dQw4w9WgXcQ", "Segredo"]) {
+      expect(JSON.stringify(d)).not.toContain(leaked);
+      expect(JSON.stringify(listed)).not.toContain(leaked);
+    }
     expect((await latestVideos(m, 50)).some((x) => x.id === v.id)).toBe(false);
     expect(await code(getLesson(m, c.slug, v.slug))).toBe("forbidden");
+    // Same answer for a slug that does not exist: no way to probe video names.
+    expect(await code(getLesson(m, c.slug, "nao-existe"))).toBe("forbidden");
     expect(await code(setLessonComplete(m, v.id, true))).toBe("forbidden");
 
     await setAccessTier(admin, m.id, "full");

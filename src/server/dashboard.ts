@@ -1,6 +1,6 @@
-import { desc, eq, inArray } from "drizzle-orm";
+import { count, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { lessonProgress, posts, projectUpdates, type User } from "@/db/schema";
+import { lessonProgress, posts, projectUpdates, users, type User } from "@/db/schema";
 import { challengePhase } from "@/lib/challenge-state";
 import { daysUntil } from "@/lib/format";
 import { listChallenges } from "./challenges";
@@ -72,4 +72,10 @@ export async function memberDashboard(user: User) {
     hasPosted: !!posted,
     hasWatched: !!watched,
   };
+}
+
+/** Real figures for the community header (demo and real accounts counted apart). */
+export async function communityStats(viewer: User) {
+  const [m] = await db.select({ n: count() }).from(users).where(eq(users.isDemo, viewer.isDemo));
+  return { members: m.n };
 }

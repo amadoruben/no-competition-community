@@ -22,7 +22,7 @@ test("exclusive videos: locked for members until the admin grants full access", 
   const mem = await loginAs(browser, MEMBER);
   await mem.goto("/videos");
   await mem.getByRole("link", { name: new RegExp(COLLECTION) }).click();
-  await expect(mem.getByText("Conteúdo exclusivo.")).toBeVisible();
+  await expect(mem.getByText(/Este conteúdo é exclusivo/)).toBeVisible();
   await expect(mem.getByRole("link", { name: VIDEO })).toHaveCount(0);
   await expect(mem.locator("iframe")).toHaveCount(0);
   // Direct link to the video goes back to the locked collection.
@@ -61,7 +61,7 @@ test("Início: members post, the admin moderates, the profile shows the activity
 
   const inv = await loginAs(browser, INVESTOR);
   await inv.goto("/dashboard");
-  const card = inv.locator("div", { has: inv.getByRole("link", { name: title }) }).last();
+  const card = inv.locator("article", { has: inv.getByRole("link", { name: title }) });
   await card.getByRole("button", { name: "Remover publicação" }).click();
   await inv.getByRole("dialog").getByRole("button", { name: "Remover" }).click();
   await expect(inv.getByRole("link", { name: title })).toHaveCount(0);
@@ -85,7 +85,7 @@ test("first content: the admin's welcome announcement is pinned and official for
   await mem.goto("/dashboard?f=announcement");
   const first = mem.getByRole("link", { name: title });
   await expect(first).toBeVisible();
-  const card = mem.locator("div", { has: first }).last();
+  const card = mem.locator("article", { has: first });
   await expect(card.getByText("No Competition", { exact: true })).toBeVisible();
   await expect(card.getByText("Fixado")).toBeVisible();
   // Members never get the "official announcement" option.
@@ -93,7 +93,7 @@ test("first content: the admin's welcome announcement is pinned and official for
   await expect(mem.getByLabel("Tipo").locator('option[value="announcement"]')).toHaveCount(0);
 
   await inv.goto("/dashboard");
-  const own = inv.locator("div", { has: inv.getByRole("link", { name: title }) }).last();
+  const own = inv.locator("article", { has: inv.getByRole("link", { name: title }) });
   await own.getByRole("button", { name: "Remover publicação" }).click();
   await inv.getByRole("dialog").getByRole("button", { name: "Remover" }).click();
   await expect(inv.getByRole("link", { name: title })).toHaveCount(0);

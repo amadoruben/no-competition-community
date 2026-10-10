@@ -11,11 +11,11 @@
   --font-display: var(--font-bricolage), var(--font-geist), ui-sans-serif, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 
-  --color-paper: #f6f5f0;
+  --color-paper: #f4f3ee;
   --color-surface: #ffffff;
-  --color-sunken: #efede6;
-  --color-line: #e3e0d6;
-  --color-line-strong: #cfcbbf;
+  --color-sunken: #eeece5;
+  --color-line: #e4e1d8;
+  --color-line-strong: #cdc9bd;
 
   --color-ink: #101216;
   --color-ink-2: #383d45;
@@ -37,9 +37,11 @@
   --color-violet: #6d3fc0;
   --color-violet-soft: #efe8fb;
 
-  --radius-card: 14px;
-  --shadow-card: 0 1px 0 rgb(16 18 22 / 0.04), 0 1px 3px rgb(16 18 22 / 0.06);
-  --shadow-pop: 0 10px 30px -10px rgb(16 18 22 / 0.25);
+  --radius-card: 16px;
+  --shadow-card: 0 1px 2px rgb(16 18 22 / 0.05);
+  --shadow-pop: 0 12px 32px -12px rgb(16 18 22 / 0.28), 0 2px 6px -2px rgb(16 18 22 / 0.08);
+
+  --animate-rise: rise 0.35s cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
 
 html {
@@ -74,8 +76,32 @@ body {
   border-radius: 6px;
 }
 
-/* Cover art: generated from a hue so every challenge/project has a distinct,
-   consistent identity without stock imagery. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Engineering grid used by generated cover art (see components/cover-art.tsx). */
+.cover-grid {
+  background-image:
+    linear-gradient(rgb(255 255 255 / 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.06) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* Legacy hue cover, still used by a few compact surfaces. */
 .cover {
   background-color: hsl(var(--h) 45% 18%);
   background-image:

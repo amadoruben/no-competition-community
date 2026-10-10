@@ -118,12 +118,14 @@ export default async function Landing() {
           <div className="mt-8 grid gap-4 md:grid-cols-3">
             {challenges.map((c) => (
               <Link key={c.id} href="/login" className="group overflow-hidden rounded-2xl bg-surface ring-1 ring-line transition-shadow hover:shadow-[var(--shadow-pop)]">
-                <ChallengeCover hue={c.coverHue} className="flex h-36 flex-col justify-between p-4">
-                  <div className="flex justify-between">
-                    <span className="rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-medium text-white">{c.category}</span>
-                    <PhaseBadge phase={c.phase} />
+                <ChallengeCover hue={c.coverHue} seed={c.slug} theme={`${c.category} ${c.title}`} className="aspect-[16/9]">
+                  <div className="flex h-full flex-col justify-between p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="truncate rounded-full bg-black/35 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur">{c.category}</span>
+                      <PhaseBadge phase={c.phase} />
+                    </div>
+                    {c.topPrize?.value && <span className="self-start rounded-lg bg-black/40 px-2 py-1 font-display text-[17px] font-semibold text-white backdrop-blur">{c.topPrize.value}</span>}
                   </div>
-                  {c.topPrize && <span className="font-display text-2xl font-bold text-white">{c.topPrize.value}</span>}
                 </ChallengeCover>
                 <div className="p-4">
                   <h3 className="font-display text-lg font-semibold group-hover:underline">{c.title}</h3>

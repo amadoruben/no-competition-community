@@ -1,7 +1,8 @@
 import { ArrowRight, Plus } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ChallengeCover, PhaseBadge } from "@/components/domain";
+import { CoverTile, glyphFor } from "@/components/cover-art";
+import { PhaseBadge } from "@/components/domain";
 import { FirstSteps } from "@/components/first-steps";
 import { Badge, BarList, ButtonLink, Card, CardHeader, cx, EmptyState, PageHeader, Progress } from "@/components/ui";
 import { fmtDay, timeAgo } from "@/lib/format";
@@ -75,7 +76,7 @@ export default async function AdminPage() {
               {o.rows.map((r) => (
                 <li key={r.id}>
                   <Link href={`/admin/challenges/${r.id}`} className="group flex flex-col gap-3 px-5 py-4 hover:bg-sunken/40 sm:flex-row sm:items-center">
-                    <ChallengeCover hue={r.coverHue} className="hidden size-11 shrink-0 rounded-xl sm:block" />
+                    <CoverTile hue={r.coverHue} glyph={glyphFor(r.title)} className="hidden size-11 rounded-xl sm:grid" />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="truncate font-medium group-hover:underline">{r.title}</span>

@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { MobileNav, Sidebar } from "@/components/app-nav";
+import { MobileTabs, ToolsLink, TopNav } from "@/components/app-nav";
+import { toolsFor } from "@/lib/nav";
 import { Brand } from "@/components/brand";
 import { Toaster } from "@/components/toaster";
 import { UserMenu } from "@/components/user-menu";
@@ -8,32 +9,34 @@ import { homeFor, requireUser } from "@/server/session";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const user = await requireUser();
-  const brand = <Brand href={homeFor(user)} stacked />;
-  const account = (
-    <div className="space-y-2">
-      {user.isDemo && (
-        <Link href="/demo" className="block rounded-lg bg-volt-soft px-3 py-1.5 text-center text-[11px] font-semibold tracking-wide text-ink uppercase ring-1 ring-volt-strong/50 hover:bg-volt" title="Abrir a visita guiada">
-          Demonstração · guia
-        </Link>
-      )}
-      <UserMenu name={user.name} handle={user.handle} hue={user.avatarHue} fileId={user.avatarFileId} roleLabel={ROLE_LABEL[user.role]} placement="up" />
-    </div>
-  );
+  const tools = toolsFor(user.role).map(({ href, label }) => ({ href, label }));
   return (
-    <div className="flex min-h-dvh">
+    <div className="flex min-h-dvh flex-col">
       <a href="#main" className="sr-only z-[70] rounded-full bg-ink px-4 py-2 text-white focus:not-sr-only focus:fixed focus:top-3 focus:left-3">
         Saltar para o conteúdo
       </a>
-      <Sidebar role={user.role} handle={user.handle} brand={brand} footer={account} />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <MobileNav role={user.role} handle={user.handle} brand={brand} footer={account} />
-        <main id="main" tabIndex={-1} className="mx-auto w-full max-w-[1160px] flex-1 px-4 py-6 outline-none sm:px-6 sm:py-8 lg:px-10">
-          {children}
-        </main>
-        <footer className="border-t border-line px-4 pt-5 pb-24 text-center text-[12px] text-muted sm:px-6 lg:px-10 lg:pb-5">
-          No Competition Community{user.isDemo ? " · Dados de demonstração fictícios" : ""}
-        </footer>
-      </div>
+      <header className="sticky top-0 z-40 border-b border-line bg-surface/90 backdrop-blur-md">
+        <div className="mx-auto flex h-14 max-w-[1180px] items-center gap-6 px-4 sm:px-6 lg:h-16 lg:px-8">
+          <Brand href={homeFor(user)} stacked />
+          <TopNav handle={user.handle} />
+          <div className="ml-auto flex items-center gap-2">
+            {user.isDemo && (
+              <Link href="/demo" className="hidden h-8 items-center rounded-full bg-volt-soft px-3 text-[11px] font-semibold tracking-wide text-ink uppercase ring-1 ring-volt-strong/50 hover:bg-volt sm:inline-flex" title="Abrir a visita guiada">
+                Demonstração
+              </Link>
+            )}
+            <ToolsLink role={user.role} />
+            <UserMenu name={user.name} handle={user.handle} hue={user.avatarHue} fileId={user.avatarFileId} roleLabel={ROLE_LABEL[user.role]} tools={tools} demo={user.isDemo} />
+          </div>
+        </div>
+      </header>
+      <main id="main" tabIndex={-1} className="mx-auto w-full max-w-[1180px] flex-1 px-4 py-6 outline-none sm:px-6 lg:px-8 lg:py-8">
+        {children}
+      </main>
+      <footer className="border-t border-line px-4 pt-5 pb-24 text-center text-[12px] text-muted sm:px-6 lg:pb-5">
+        No Competition Community{user.isDemo ? " · Dados de demonstração fictícios" : ""}
+      </footer>
+      <MobileTabs handle={user.handle} />
       <Toaster />
     </div>
   );

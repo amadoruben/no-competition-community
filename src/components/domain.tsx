@@ -3,10 +3,10 @@ import Link from "next/link";
 import type { ChallengeCard as ChallengeCardData } from "@/server/challenges";
 import type { FeedItem } from "@/server/community";
 import { challengePhase, PHASE_LABEL, type ChallengePhase } from "@/lib/challenge-state";
-import { deadlineText, fmtDay, timeAgo } from "@/lib/format";
+import { deadlineText, fmtDay, plural, timeAgo } from "@/lib/format";
 import { PHASE_TONE, POST_KIND_LABEL, ROLE_LABEL, STAGE_LABEL } from "@/lib/labels";
 import type { Project, ProjectStage, Role } from "@/db/schema";
-import { Avatar, Badge, Card, ChallengeCover, cx, ProjectLogo, type Tone } from "./ui";
+import { Avatar, Badge, Card, ChallengeCover, cx, ProjectLogo } from "./ui";
 
 export { ChallengeCover };
 import { PostActions } from "./post-actions";
@@ -36,39 +36,33 @@ export function phaseTimeline(c: { startsAt: Date; submissionDeadline: Date; res
 export function ChallengeCard({ c, href }: { c: ChallengeCardData; href?: string }) {
   const phase = challengePhase(c);
   return (
-    <Link href={href ?? `/challenges/${c.slug}`} className="group block focus-visible:rounded-[var(--radius-card)]">
-      <Card className="flex h-full flex-col overflow-hidden transition-shadow group-hover:shadow-[var(--shadow-pop)]">
-        <ChallengeCover hue={c.coverHue} className="h-28 p-4">
-          <div className="flex items-start justify-between gap-2">
-            <span className="rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur">{c.category}</span>
-            <PhaseBadge phase={phase} />
-          </div>
-          {c.topPrize && (
-            <div className="absolute bottom-3 left-4 font-display text-[22px] font-bold text-white drop-shadow-sm">
-              {c.topPrize.value}
+    <Link href={href ?? `/challenges/${c.slug}`} className="group block h-full rounded-[var(--radius-card)]">
+      <div className="flex h-full flex-col overflow-hidden rounded-[var(--radius-card)] bg-surface shadow-[var(--shadow-card)] ring-1 ring-line/80 transition duration-200 group-hover:-translate-y-0.5 group-hover:shadow-[var(--shadow-pop)]">
+        <ChallengeCover hue={c.coverHue} seed={c.slug} theme={`${c.category} ${c.title}`} className="aspect-[16/9]">
+          <div className="flex h-full flex-col justify-between p-3">
+            <div className="flex items-start justify-between gap-2">
+              <span className="truncate rounded-full bg-black/35 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur">{c.category}</span>
+              <PhaseBadge phase={phase} />
             </div>
-          )}
+            {c.topPrize?.value && <span className="self-start rounded-lg bg-black/40 px-2 py-1 font-display text-[17px] font-semibold text-white backdrop-blur">{c.topPrize.value}</span>}
+          </div>
         </ChallengeCover>
         <div className="flex flex-1 flex-col p-4">
-          <h3 className="font-display text-[18px] leading-snug font-semibold group-hover:underline group-hover:decoration-2 group-hover:underline-offset-4">
-            {c.title}
-          </h3>
-          <p className="mt-1 line-clamp-2 text-sm text-ink-2">{c.tagline}</p>
-          <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-1 pt-4 text-[13px] text-muted">
+          <h3 className="line-clamp-2 font-display text-[17px] leading-snug font-semibold group-hover:underline group-hover:decoration-2 group-hover:underline-offset-4">{c.title}</h3>
+          <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-ink-2">{c.tagline}</p>
+          <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-2 pt-4 text-[13px] text-muted">
             <span className={cx("flex items-center gap-1.5", phase === "open" && "font-medium text-ink")}>
               <CalendarClock className="size-4" /> {phaseTimeline(c, phase)}
             </span>
-            <span className="flex items-center gap-1.5">
-              <Users className="size-4" /> {c.participantCount}
-            </span>
-            {c.viewerSubmitted ? (
-              <Badge tone="ok">Submetido</Badge>
-            ) : c.viewerEnrolled ? (
-              <Badge tone="info">Inscrito</Badge>
-            ) : null}
+            {c.participantCount > 0 && (
+              <span className="flex items-center gap-1.5">
+                <Users className="size-4" /> {c.participantCount} {c.participantCount === 1 ? "inscrito" : "inscritos"}
+              </span>
+            )}
+            {c.viewerSubmitted ? <Badge tone="ok">Submetido</Badge> : c.viewerEnrolled ? <Badge tone="info">Inscrito</Badge> : null}
           </div>
         </div>
-      </Card>
+      </div>
     </Link>
   );
 }
@@ -126,7 +120,6 @@ export function PersonLine({
   );
 }
 
-const KIND_TONE: Record<string, Tone> = { announcement: "dark", discussion: "neutral", progress: "ok", question: "info" };
 
 /** The investor is the No Competition team: their posts and profile carry the brand mark. */
 export function RoleTag({ role }: { role: Role }) {
@@ -139,6 +132,8 @@ export function RoleTag({ role }: { role: Role }) {
     );
   return <Badge tone="violet" className="h-5 px-2 text-[11px]">{ROLE_LABEL[role]}</Badge>;
 }
+
+const KIND_DOT: Record<string, string> = { announcement: "bg-ink", discussion: "bg-faint", progress: "bg-ok", question: "bg-info" };
 
 export function PostCard({
   item,
@@ -154,59 +149,73 @@ export function PostCard({
 }) {
   const p = item.post;
   return (
-    <Card className={cx("p-4 sm:p-5", p.kind === "announcement" && "ring-ink/15")}>
-      <div className="flex items-start gap-3">
-        <Avatar name={item.authorName} hue={item.authorHue} fileId={item.authorAvatar} size={38} />
+    <article className={cx("rounded-[var(--radius-card)] bg-surface p-4 shadow-[var(--shadow-card)] ring-1 ring-line/80 sm:p-5", p.pinned && "ring-ink/20")}>
+      <header className="flex items-start gap-3">
+        <Link href={`/members/${item.authorHandle}`} className="shrink-0 rounded-full" tabIndex={-1} aria-hidden>
+          <Avatar name={item.authorName} hue={item.authorHue} fileId={item.authorAvatar} size={42} />
+        </Link>
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px]">
-            <Link href={`/members/${item.authorHandle}`} className="font-medium text-ink hover:underline">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <Link href={`/members/${item.authorHandle}`} className="text-[14px] font-semibold text-ink hover:underline">
               {item.authorName}
             </Link>
             <RoleTag role={item.authorRole} />
-            <span className="text-muted">· {timeAgo(p.createdAt)}</span>
-            {p.pinned && (
-              <span className="flex items-center gap-1 text-muted">
-                · <Pin className="size-3.5" /> Fixado
-              </span>
-            )}
           </div>
-          <div className="mt-1.5 flex flex-wrap items-center gap-2">
-            <Badge tone={KIND_TONE[p.kind]} className="h-5 px-2 text-[11px]">
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[12.5px] text-muted">
+            <time dateTime={p.createdAt.toISOString()}>{timeAgo(p.createdAt)}</time>
+            <span aria-hidden>·</span>
+            <span className="inline-flex items-center gap-1.5">
+              <span aria-hidden className={cx("size-1.5 rounded-full", KIND_DOT[p.kind])} />
               {POST_KIND_LABEL[p.kind]}
-            </Badge>
+            </span>
             {item.challengeTitle && (
-              <Link href={`/challenges/${item.challengeSlug}`} className="text-[12px] font-medium text-muted hover:text-ink">
-                em {item.challengeTitle}
-              </Link>
+              <>
+                <span aria-hidden>·</span>
+                <Link href={`/challenges/${item.challengeSlug}`} className="truncate font-medium hover:text-ink hover:underline">
+                  {item.challengeTitle}
+                </Link>
+              </>
             )}
             {item.projectName && (
-              <Link href={`/projects/${item.projectSlug}`} className="text-[12px] font-medium text-muted hover:text-ink">
-                · {item.projectName}
-              </Link>
-            )}
-          </div>
-          <Link href={`/community/${p.id}`} className="group mt-2 block">
-            <h3 className="text-[16px] leading-snug font-semibold group-hover:underline">{p.title}</h3>
-            <p className={cx("mt-1 text-[14px] whitespace-pre-line text-ink-2", full ? "" : compact ? "line-clamp-2" : "line-clamp-4")}>{p.body}</p>
-          </Link>
-          <div className="mt-3 flex items-center gap-1">
-            <ReactionButton postId={p.id} count={item.reactionCount} active={item.viewerReacted} />
-            <Link href={`/community/${p.id}`} className="flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[13px] text-muted hover:bg-sunken hover:text-ink">
-              <MessageCircle className="size-4" /> {item.commentCount}
-            </Link>
-            {viewer && (
-              <PostActions
-                postId={p.id}
-                pinned={p.pinned}
-                canPin={viewer.role === "investor"}
-                canDelete={viewer.role === "investor" || viewer.id === p.authorId}
-                afterDelete={full ? "/dashboard" : undefined}
-              />
+              <>
+                <span aria-hidden>·</span>
+                <Link href={`/projects/${item.projectSlug}`} className="truncate font-medium hover:text-ink hover:underline">
+                  {item.projectName}
+                </Link>
+              </>
             )}
           </div>
         </div>
-      </div>
-    </Card>
+        {p.pinned && (
+          <span className="flex shrink-0 items-center gap-1 rounded-full bg-sunken px-2 py-1 text-[11px] font-medium text-ink-2">
+            <Pin className="size-3" /> Fixado
+          </span>
+        )}
+      </header>
+      <Link href={`/community/${p.id}`} className="group mt-3 block">
+        <h3 className={cx("leading-snug font-semibold text-ink group-hover:underline", full ? "font-display text-[22px]" : "text-[16.5px]")}>{p.title}</h3>
+        <p className={cx("mt-1.5 text-[15px] leading-relaxed whitespace-pre-line text-ink-2", full ? "" : compact ? "line-clamp-2" : "line-clamp-4")}>{p.body}</p>
+      </Link>
+      <footer className="mt-4 flex items-center gap-1 border-t border-line/70 pt-3">
+        <ReactionButton postId={p.id} count={item.reactionCount} active={item.viewerReacted} />
+        <Link
+          href={`/community/${p.id}`}
+          aria-label={plural(item.commentCount, "comentário", "comentários")}
+          className="flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[13px] text-muted hover:bg-sunken hover:text-ink"
+        >
+          <MessageCircle className="size-4" /> {item.commentCount}
+        </Link>
+        {viewer && (
+          <PostActions
+            postId={p.id}
+            pinned={p.pinned}
+            canPin={viewer.role === "investor"}
+            canDelete={viewer.role === "investor" || viewer.id === p.authorId}
+            afterDelete={full ? "/dashboard" : undefined}
+          />
+        )}
+      </footer>
+    </article>
   );
 }
 

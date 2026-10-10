@@ -1,7 +1,7 @@
 /**
  * Exclusive video library on the existing learning model: a collection is a
  * course, its sections are modules, each video is a lesson (video_url + notes).
- * Locked collections never send video links or notes to the browser.
+ * Locked collections never send video titles, links, notes or thumbnails to the browser.
  */
 import { and, asc, desc, eq, inArray, max } from "drizzle-orm";
 import { z } from "zod";
@@ -20,7 +20,7 @@ export async function listCourses(viewer: User) {
   const [all, mods, less, done] = await Promise.all([
     db.select().from(courses).orderBy(asc(courses.position), asc(courses.title)),
     db.select().from(modules).orderBy(asc(modules.position)),
-    db.select({ id: lessons.id, slug: lessons.slug, moduleId: lessons.moduleId, durationMin: lessons.durationMin, videoUrl: lessons.videoUrl, position: lessons.position }).from(lessons).orderBy(asc(lessons.position)),
+    db.select({ id: lessons.id, slug: lessons.slug, title: lessons.title, moduleId: lessons.moduleId, durationMin: lessons.durationMin, videoUrl: lessons.videoUrl, position: lessons.position }).from(lessons).orderBy(asc(lessons.position)),
     db.select({ id: lessonProgress.lessonId }).from(lessonProgress).where(eq(lessonProgress.userId, viewer.id)),
   ]);
   const doneIds = new Set(done.map((r) => r.id));
@@ -28,15 +28,20 @@ export async function listCourses(viewer: User) {
     const modIds = mods.filter((m) => m.courseId === c.id).map((m) => m.id);
     const ls = modIds.flatMap((id) => less.filter((l) => l.moduleId === id));
     const locked = !canAccessTier(viewer, c.accessTier);
+    // Locked collections expose only their own title, description and size:
+    // no video titles, links, thumbnails (they reveal the video id) or slugs.
+    const videos = locked
+      ? []
+      : ls.map((l) => ({ id: l.id, slug: l.slug, title: l.title, durationMin: l.durationMin, done: doneIds.has(l.id), thumbnail: videoSource(l.videoUrl)?.thumbnail ?? null }));
     return {
       ...c,
       locked,
       lessonCount: ls.length,
       videoCount: ls.filter((l) => l.videoUrl).length,
       minutes: ls.reduce((s, l) => s + l.durationMin, 0),
-      completed: ls.filter((l) => doneIds.has(l.id)).length,
-      // A thumbnail reveals the video id: only for collections the viewer can watch.
-      thumbnail: locked ? null : (ls.map((l) => videoSource(l.videoUrl)?.thumbnail).find(Boolean) ?? null),
+      completed: locked ? 0 : ls.filter((l) => doneIds.has(l.id)).length,
+      thumbnail: videos.map((v) => v.thumbnail).find(Boolean) ?? null,
+      videos,
     };
   });
 }
@@ -47,6 +52,9 @@ export async function getCourse(viewer: User, slug: string) {
   const locked = !canAccessTier(viewer, course.accessTier);
   const mods = await db.select().from(modules).where(eq(modules.courseId, course.id)).orderBy(asc(modules.position));
   const ls = mods.length ? await db.select().from(lessons).where(inArray(lessons.moduleId, mods.map((m) => m.id))).orderBy(asc(lessons.position)) : [];
+  const size = { lessonCount: ls.length, minutes: ls.reduce((s, l) => s + l.durationMin, 0) };
+  // Locked: the collection itself and its size, nothing about the videos in it.
+  if (locked) return { course, locked, ...size, outline: [], flat: [], completed: 0 };
   const done = new Set(
     ls.length
       ? (
@@ -57,18 +65,19 @@ export async function getCourse(viewer: User, slug: string) {
         ).map((r) => r.id)
       : [],
   );
-  const shown = (l: (typeof ls)[number]) => ({ ...l, done: done.has(l.id), ...(locked ? { content: "", videoUrl: null } : {}) });
+  const shown = (l: (typeof ls)[number]) => ({ ...l, done: done.has(l.id), thumbnail: videoSource(l.videoUrl)?.thumbnail ?? null });
   const outline = mods.map((m) => ({ ...m, lessons: ls.filter((l) => l.moduleId === m.id).map(shown) }));
   const flat = outline.flatMap((m) => m.lessons);
-  return { course, locked, outline, flat, completed: flat.filter((l) => l.done).length };
+  return { course, locked, ...size, outline, flat, completed: flat.filter((l) => l.done).length };
 }
 
 /** One video with its collection; refuses locked content on the server. */
 export async function getLesson(viewer: User, courseSlug: string, lessonSlug: string) {
   const d = await getCourse(viewer, courseSlug);
+  // Checked before the lookup, so a locked collection does not confirm which video slugs exist.
+  if (d.locked) throw forbidden(LOCKED_MESSAGE);
   const idx = d.flat.findIndex((l) => l.slug === lessonSlug);
   if (idx < 0) throw notFound("Vídeo não encontrado.");
-  if (d.locked) throw forbidden(LOCKED_MESSAGE);
   return { ...d, lesson: d.flat[idx], prev: d.flat[idx - 1] ?? null, next: d.flat[idx + 1] ?? null };
 }
 
