@@ -10,6 +10,10 @@ A aplicação protege-se disto: `db:migrate`, `db:seed`, `db:import`, `user:role
 
 ## 1. Os valores e onde estão
 
+**Caminho mais simples (o usado na Preview da NCC):** instalar a integração **Supabase ↔ Vercel** (Vercel → Integrations → Supabase) e escolher o projecto da NCC. Cria `POSTGRES_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, … no ambiente *Production*; marcar também *Preview* nas que a app usa. A aplicação aceita esses nomes directamente (`POSTGRES_URL` é usado quando não há `DATABASE_URL` utilizável) — não é preciso copiar valores. Falta apenas, por ambiente: `APP_ENV`, `AUTH_PROVIDER=supabase`, `STORAGE_PROVIDER=supabase`, `DEMO_MODE`.
+
+**Caminho manual** (máquina local ou sem integração):
+
 Dashboard do Supabase → projecto da NCC:
 
 Todos os valores são **colados tal como o dashboard os mostra** — nada a editar ou montar.
@@ -39,6 +43,8 @@ A ligação *Direct connection* (`db.<ref>.supabase.co`) é só IPv6 e não func
   - `http://localhost:3000/**`
   - `https://no-competition-community-git-claude-no-compet-150e52-amadoruben.vercel.app/**` (preview desta branch)
   - mais tarde: `https://<domínio de produção>/auth/callback` e `/reset-password`
+
+**Automático:** `npm run supabase:auth-config` aplica Site URL, Redirect URLs, SMTP e os modelos de email em português de uma vez (dry run primeiro; ver `docs/OPERATIONS.md` §8). Os passos manuais abaixo são o equivalente no dashboard.
 
 **Links de email em qualquer dispositivo (opcional, recomendado):** com os modelos por omissão, o link de confirmação e o de recuperação só funcionam no browser onde o pedido foi feito (PKCE). Para funcionarem noutro dispositivo, em **Authentication → Emails → Templates** troque o link por:
 - *Confirm signup*: `{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=email`

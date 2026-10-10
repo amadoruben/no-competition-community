@@ -160,7 +160,7 @@ describe("SupabaseAuthProvider sign-up: every outcome is a clear answer, never a
     expect(await outcome("known")).toMatch(/^exists:Já existe uma conta/);
     expect(await outcome("smtp")).toMatch(/^unavailable:Não foi possível enviar o email de confirmação/);
     expect(await outcome("notteam")).toMatch(/^unavailable:Não foi possível enviar o email de confirmação/);
-    expect(await outcome("limit")).toMatch(/^throttled:O limite de envio de emails/);
+    expect(await outcome("limit")).toMatch(/^throttled:O limite de envio de emails foi atingido/);
     expect(await outcome("down")).toMatch(/^unavailable:/);
     expect(await outcome("weak")).toMatch(/^invalid:A palavra-passe é demasiado fraca/);
   });

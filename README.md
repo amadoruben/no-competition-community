@@ -6,7 +6,7 @@ Plataforma onde um investidor lança desafios, os membros constroem e submetem p
 
 - Arquitectura e versões: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - **Ligar ao Supabase (passo a passo):** [`docs/SUPABASE-SETUP.md`](docs/SUPABASE-SETUP.md)
-- Deploy, backups, monitorização e mudança de fornecedor: [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
+- Deploy, backups, monitorização, email (SMTP), **diagnóstico** e mudança de fornecedor: [`docs/OPERATIONS.md`](docs/OPERATIONS.md)
 - Design system: [`docs/DESIGN-SYSTEM.md`](docs/DESIGN-SYSTEM.md) · referência viva em `/design`
 
 ## Arrancar localmente
@@ -53,6 +53,7 @@ A página pública **`/demo`** (visita guiada) tem estes passos com um botão qu
 | `npm run db:verify -- f.json` | comparar base viva com exportação |
 | `npm run supabase:check` | diagnóstico da ligação ao Supabase sem mostrar segredos (`-- --auth-roundtrip` testa login real) |
 | `npm run supabase:bootstrap` | criar o bucket privado no Supabase |
+| `npm run supabase:auth-config` | configurar SMTP, modelos de email PT-PT, Site URL e Redirect URLs do Supabase Auth (dry run; `-- --apply` aplica) |
 | `npm run user:role -- <email> <papel>` | promover uma conta a `investor`/`evaluator` (só com credenciais da BD) |
 
 ## Testes
@@ -61,6 +62,7 @@ A página pública **`/demo`** (visita guiada) tem estes passos com um botão qu
 npm run lint && npm run typecheck
 npm test                                                   # unitários + integração (PGlite)
 TEST_DATABASE_URL=postgres://…/ncc_test npm test           # os mesmos contra PostgreSQL real
+TEST_DATABASE_TLS=1 TEST_DATABASE_URL=… npm test           # + verificação de TLS (servidor com ssl = on)
 E2E_DATABASE_URL=postgres://…/ncc_e2e npm run test:e2e     # build + Playwright (desktop e telemóvel)
 ```
 
@@ -70,12 +72,8 @@ CI (`.github/workflows/ci.yml`): lint, tipos, testes em PGlite e PostgreSQL 16, 
 
 ## Estado
 
-**Funcional e testado:** ciclo completo de desafios (criar, editar, publicar, pausar, encerrar, reabrir), critérios ponderados, prémios, inscrição e submissão, atribuição de avaliadores, avaliação confidencial, comparação, confirmação com justificação, publicação com anúncio, histórico de decisões, pipeline de investimento, projectos com equipa, logótipo e actualizações, perfis com fotografia, comunidade, classificações (geral, semanal, mérito, participação, por desafio), cursos, recuperação de palavra-passe.
+**Funcional e testado:** ciclo completo de desafios (criar, editar, publicar, pausar, encerrar, reabrir), critérios ponderados, prémios, inscrição e submissão, atribuição de avaliadores, avaliação confidencial, comparação, confirmação com justificação, publicação com anúncio, histórico de decisões, pipeline de investimento, projectos com equipa, logótipo e actualizações, perfis com fotografia, comunidade, classificações, cursos, recuperação de palavra-passe, reenvio do email de confirmação, eliminação da própria conta (RGPD art. 17).
 
-**Infra-estrutura:** PostgreSQL (Supabase ou outro) via Drizzle; Auth e Storage atrás de interfaces próprias com implementações local e Supabase; exportação/restauro verificáveis; health check; logs estruturados; Docker para alojamento fora da Vercel.
+**Preview na Vercel ligada ao Supabase da NCC — verificado com o projecto real:** ligação PostgreSQL por TLS (pooler em modo transacção, driver `pg`), migrações, RLS em todas as tabelas, a chave pública não lê dados nem lista ficheiros, bucket privado, login real, confirmação de email e recuperação de palavra-passe com emails reais, redireccionamentos, páginas principais e carga (39 pedidos sem falhas). Cada build da Vercel repete estas verificações (`supabase:check`) e falha se alguma não passar.
 
-**Apresentação:** landing com proposta de valor por papel, visita guiada `/demo`, dados fictícios assinalados (só em modo de demonstração). A landing, `/demo` e `/login` abrem mesmo sem base de dados.
-
-**Email:** Supabase Auth envia confirmação e recuperação pelo SMTP configurado no Supabase; a app suporta `SMTP_URL`/`EMAIL_WEBHOOK_URL` para auth local (`docs/OPERATIONS.md` §8).
-
-**Pendente de acções externas:** projecto Supabase acessível e variáveis de ambiente na Vercel, SMTP no Supabase, secrets de backup (ver `docs/OPERATIONS.md` §2, §4 e §8). O adaptador Supabase Auth/Storage foi testado contra uma simulação da API HTTP, não contra um projecto real. A Vercel já faz build deste repositório (previews por branch).
+**Pendente de decisões/acções do titular:** SMTP próprio (o SMTP por omissão do Supabase só entrega à equipa e envia 2 emails/hora — `docs/OPERATIONS.md` §8), domínio de produção, variáveis do ambiente *Production*, secrets de backup (§4).

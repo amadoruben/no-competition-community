@@ -32,7 +32,7 @@ Pré-requisitos que dependem do titular das contas: projecto Supabase dedicado (
 7. Correr o *advisor* de segurança do Supabase: não deve haver tabelas sem RLS.
 8. **Email (obrigatório antes de abrir registos ao público):** configurar SMTP próprio no Supabase (§8).
 
-**Região:** a função Vercel corre por omissão em `iad1` (EUA-Leste, confirmado nos cabeçalhos do preview). Escolher o projecto Supabase na mesma região, ou mudar a região da função em *Vercel → Settings → Functions* para a do Supabase: cada pedido faz várias consultas e a latência entre continentes multiplica-se.
+**Região:** a função Vercel corre em `iad1` (EUA-Leste) e o projecto Supabase da NCC está em `sa-east-1` (São Paulo). Medido na Preview: uma consulta simples custa ~0,2–1 s de ida e volta; a página inicial demora 0,3–0,5 s e o registo ~2,5–3,5 s. Funciona, mas cada consulta atravessa continentes. Para produção, alinhar: função e base na mesma região. Como os utilizadores e os dados pessoais são da UE (RGPD), a opção mais coerente é um projecto Supabase de produção numa região UE (ex.: `eu-west-1`/`eu-central-1`) e a função Vercel na mesma zona (`fra1`/`dub1`). A região de um projecto Supabase não muda depois de criado: decidir antes de haver dados reais.
 
 **Protecção de deployments:** a Vercel protege por omissão os URLs `*.vercel.app` com *Vercel Authentication*. Para uma demonstração pública: (a) domínio próprio para produção/demo, que não é afectado, ou (b) desligar a protecção só para Preview em *Settings → Deployment Protection*. É uma decisão do titular da conta.
 
@@ -136,23 +136,73 @@ Quem envia o quê:
 |---|---|---|
 | Confirmação de registo, recuperação de palavra-passe | Supabase Auth, pelo SMTP configurado no Supabase | a aplicação (`src/server/mail.ts`) via `SMTP_URL` ou `EMAIL_WEBHOOK_URL` |
 
-**O SMTP por omissão do Supabase não serve para produção** (documentação Supabase, *Auth → SMTP*): só entrega a endereços da equipa da organização ("Email address not authorized" para os restantes), com limite horário baixo e sem SLA. Com SMTP próprio, o limite inicial é 30 emails/hora — ajustar em *Auth → Rate Limits*.
+### Estado actual (Preview)
 
-Configuração: *Supabase → Authentication → Emails → SMTP Settings* (host, porta, utilizador, palavra-passe, remetente). As credenciais ficam no Supabase; não entram no repositório nem na Vercel.
+O projecto usa o **SMTP por omissão do Supabase**. Testado com envio real (10/10/2026): confirmação e recuperação chegam em ~2 s a endereços da equipa da organização Supabase (incluindo aliases `+…` do Gmail do titular). **Não serve para produção** ([documentação Supabase](https://supabase.com/docs/guides/auth/auth-smtp)): só entrega a membros da equipa ("Email address not authorized" para os restantes), **2 emails/hora** para todo o projecto (o 3.º pedido na hora devolve 429 — a app mostra "O limite de envio de emails foi atingido…"), sem SLA. Com SMTP próprio o limite passa a 30/hora, ajustável em *Auth → Rate Limits*.
 
-### Opções
+### Fornecedor recomendado (preços lidos nas páginas oficiais a 10/10/2026)
 
-| Opção | Adequado para | Limitações |
-|---|---|---|
-| **Conta Gmail da NCC** (`smtp.gmail.com`, porta 465, *App Password*) | demonstração e piloto com poucos utilizadores | exige verificação em 2 passos; o *App Password* é revogado se a palavra-passe da conta mudar; limite ≈500 emails/dia numa conta pessoal (2 000 em Google Workspace); remetente `@gmail.com` tem pior entregabilidade e não permite SPF/DKIM do domínio próprio; a Google desaconselha *App Passwords* |
-| **Fornecedor transaccional** (Resend, Postmark, Amazon SES, Brevo…) com domínio próprio | produção | requer domínio e registos DNS (SPF, DKIM, DMARC); planos gratuitos com limites próprios |
+| Fornecedor | Gratuito | Primeiro plano pago | Região UE | Na lista do Supabase |
+|---|---|---|---|---|
+| **Resend** | 3 000/mês, **100/dia** | 20 USD/mês (50 000) | envio a partir da Irlanda; dados da conta nos EUA; DPA com SCC | sim |
+| **ZeptoMail** (Zoho) | 10 000 emails (crédito válido 6 meses) | 2,50 USD por 10 000 (sem mensalidade) | centro de dados UE (`smtp.zeptomail.eu`) | sim |
+| Amazon SES | sandbox: 200/24 h até aprovação | 0,10 USD por 1 000 | Frankfurt, Irlanda, Paris, … | sim |
+| Brevo | 300/dia | 9 USD/mês (5 000) | empresa francesa; alojamento não indicado | sim |
+| Postmark | 100/mês | 15 USD/mês (10 000) | não | sim |
 
-Recomendação: Gmail apenas para a demonstração; antes de produção, domínio próprio + fornecedor transaccional. A conta Gmail continua útil como endereço de contacto e de `Reply-To`.
+Fontes: [resend.com/pricing](https://resend.com/pricing), [zoho.com/cpaas/pricing](https://www.zoho.com/cpaas/pricing.html), [aws.amazon.com/ses/pricing](https://aws.amazon.com/ses/pricing/), [brevo.com/pricing](https://www.brevo.com/pricing/), [postmarkapp.com/pricing](https://postmarkapp.com/pricing).
 
-Passos com Gmail (feitos pelo titular da conta, nunca em código):
-1. Conta Google → Segurança → activar verificação em 2 passos.
-2. Conta Google → *App passwords* → criar uma para "Supabase NCC".
-3. Supabase → SMTP Settings: host `smtp.gmail.com`, porta `465`, utilizador = endereço Gmail, palavra-passe = *App Password*, remetente = o mesmo endereço.
-4. Testar: registar uma conta com um endereço externo à equipa e pedir recuperação de palavra-passe; os links devem abrir `/auth/callback` e `/reset-password` no domínio certo.
+**Recomendação:** **Resend** para o MVP (configuração mais simples, guia oficial para Supabase, plano gratuito cobre o arranque). **Se os dados de email tiverem de ficar na UE**, ZeptoMail (região UE). Em ambos é preciso um **domínio próprio** com SPF, DKIM e DMARC — idealmente um subdomínio só para autenticação (ex.: `auth.<domínio>`, remetente `no-reply@auth.<domínio>`). Não usar Gmail pessoal como SMTP de produção (limites diários, remetente `@gmail.com` sem DKIM do domínio, *App Passwords* desaconselhadas pela Google).
 
-Com auth local, o equivalente é `SMTP_URL=smtps://<utilizador>%40gmail.com:<app-password>@smtp.gmail.com:465` como variável **secreta** do ambiente (testado contra um servidor SMTP em `src/server/__tests__/mail.test.ts`; os logs nunca incluem o URL).
+Risco a considerar: o plano gratuito da Resend tem **100 emails/dia** — um pico de registos num lançamento esgota-o. Para um lançamento público, plano pago ou ZeptoMail.
+
+### Configurar (um comando, sem copiar campos à mão)
+
+1. No fornecedor: criar conta, verificar o domínio (registos DNS que o fornecedor indica) e criar uma credencial SMTP.
+2. Num `.env.local` (nunca no Git), além de `NEXT_PUBLIC_SUPABASE_URL`:
+   ```bash
+   SUPABASE_ACCESS_TOKEN=…          # supabase.com/dashboard/account/tokens (pessoal; revogar depois)
+   SMTP_URL=smtps://resend:<API_KEY>@smtp.resend.com:465
+   EMAIL_FROM="No Competition Community <no-reply@auth.<domínio>>"
+   APP_URL=https://<domínio de produção>
+   AUTH_REDIRECT_URLS=https://no-competition-community-*-amadoruben.vercel.app/**   # previews (só no projecto de preview)
+   AUTH_EMAIL_RATE_LIMIT=100
+   ```
+3. `npm run supabase:auth-config` — mostra o que vai mudar (palavras-passe mascaradas). Depois `npm run supabase:auth-config -- --apply`.
+
+O comando aplica, pela [Management API](https://supabase.com/docs/reference/api/v1-update-auth-service-config): SMTP, remetente, Site URL, Redirect URLs, limite de emails/hora e **modelos de email em português** com links `token_hash` (abrem em qualquer dispositivo, não só no browser onde se fez o pedido; `/auth/callback` e `/reset-password` aceitam os dois formatos). `--no-templates` mantém os modelos actuais.
+
+4. **Teste real obrigatório** antes de declarar o email operacional: registar com um endereço **fora** da equipa Supabase, confirmar pelo link, pedir recuperação de palavra-passe, verificar a pasta de spam.
+
+Com auth local, o mesmo `SMTP_URL`/`EMAIL_FROM` é usado pela própria app (testado contra um servidor SMTP em `src/server/__tests__/mail.test.ts`; os logs nunca incluem o URL).
+
+## 9. Diagnóstico
+
+**Primeiro passo:** `GET /api/health` (200 = configuração e base OK; 503 = JSON com os **nomes** do que falta) e o log do último build na Vercel, onde `supabase:check` corre sempre (fora de produção inclui login real e link de confirmação):
+
+| Secção | Verifica |
+|---|---|
+| 1. Configuração | todos os valores do mesmo projecto Supabase; chaves do tipo certo; pooler certo |
+| 2. Base de dados | ligação TLS; migrações; sessões abertas há muito tempo ou à espera de locks; **RLS em todas as tabelas** |
+| 3. Auth | API acessível; confirmação de email ligada/desligada |
+| 4. Storage | a chave pública **não lê nenhuma linha** das 26 tabelas pela Data API nem lista ficheiros; nenhuma política de storage aberta a `anon`/`authenticated`; bucket privado |
+| 5–6. Fora de produção | login real com utilizador temporário (apagado); Site URL; Redirect URLs deste deployment; link de confirmação → `/auth/callback` com sessão |
+
+**Eventos nos logs** (JSON, sem dados pessoais nem segredos):
+
+| Evento | Significa |
+|---|---|
+| `auth.register` | registo: `steps` com o tempo acumulado de cada passo (`validated`, `signedUp`, `profile`) e o resultado |
+| `auth.provider_error` | resposta do Supabase Auth: `status`, `code` (ex.: `429 over_email_send_rate_limit`, `email_address_not_authorized`) |
+| `action.unavailable` | base de dados ou serviço indisponível; o utilizador viu "nada foi guardado" |
+| `db.idle_connection_lost` | ligação inactiva fechada pelo servidor; o pool substitui-a (informativo) |
+| `account.deleted` / `account.delete_incomplete` | eliminação de conta (a segunda exige intervenção: identidade apagada, perfil ficou) |
+| `landing.live_data_unavailable` | a página inicial abriu sem dados ao vivo (base lenta/indisponível) |
+
+**Limites de tempo** (nenhum pedido fica pendurado): consulta 15 s no servidor e 20 s no cliente; ligação 10 s; Supabase Auth 15 s (5 s no refresh de sessão); formulários avisam aos 8 s e desistem com mensagem aos 45 s.
+
+**Problemas conhecidos e causa:**
+- *Formulário preso / pedidos de 300 s* — causa encontrada e corrigida: o driver postgres.js encadeava consultas na mesma ligação e o pooler do Supabase em modo transacção não responde a consultas encadeadas (ver §5). Se voltar a aparecer, procurar `Task timed out` nos logs e o último `auth.register`/`action.*` antes dele.
+- *"O limite de envio de emails foi atingido"* — SMTP por omissão do Supabase (§8).
+- *Link de email "expirou ou já foi utilizado"* — com os modelos por omissão (PKCE) o link só funciona no browser onde se fez o pedido; os modelos do `supabase:auth-config` resolvem.
+- *Página de investidor devolve HTTP 200 a um membro* — é o redireccionamento do Next.js depois de o streaming começar; o guarda de papel corre antes de qualquer leitura de dados (verificado na Preview: só o título estático da página vai na resposta).

@@ -179,7 +179,7 @@ function providerError(op: string, e: ProviderError): AuthError | null {
   if (throttled)
     return new AuthError(
       code === "over_email_send_rate_limit"
-        ? "O limite de envio de emails de confirmação foi atingido. Aguarde alguns minutos e tente de novo."
+        ? "O limite de envio de emails foi atingido. Aguarde alguns minutos e tente de novo."
         : "Demasiadas tentativas. Aguarde alguns minutos e tente de novo.",
       "throttled",
     );
