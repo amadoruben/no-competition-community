@@ -22,6 +22,13 @@
       "when": 1791530999061,
       "tag": "0002_files_owner_no_fk",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791616343254,
+      "tag": "0003_content_access",
+      "breakpoints": true
     }
   ]
 }

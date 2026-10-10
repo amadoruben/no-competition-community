@@ -24,13 +24,13 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       <a href="#main" className="sr-only z-[70] rounded-full bg-ink px-4 py-2 text-white focus:not-sr-only focus:fixed focus:top-3 focus:left-3">
         Saltar para o conteúdo
       </a>
-      <Sidebar role={user.role} brand={brand} footer={account} />
+      <Sidebar role={user.role} handle={user.handle} brand={brand} footer={account} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <MobileNav role={user.role} brand={brand} footer={account} />
+        <MobileNav role={user.role} handle={user.handle} brand={brand} footer={account} />
         <main id="main" tabIndex={-1} className="mx-auto w-full max-w-[1160px] flex-1 px-4 py-6 outline-none sm:px-6 sm:py-8 lg:px-10">
           {children}
         </main>
-        <footer className="border-t border-line px-4 py-5 text-center text-[12px] text-muted sm:px-6 lg:px-10">
+        <footer className="border-t border-line px-4 pt-5 pb-24 text-center text-[12px] text-muted sm:px-6 lg:px-10 lg:pb-5">
           No Competition Community{user.isDemo ? " · Dados de demonstração fictícios" : ""}
         </footer>
       </div>

@@ -30,6 +30,14 @@ const createdAt = () => ts("created_at").notNull().defaultNow();
 export const ROLES = ["member", "evaluator", "investor"] as const;
 export type Role = (typeof ROLES)[number];
 
+/**
+ * Access tiers for exclusive content. "free": every member; "full": members the
+ * No Competition team granted full access (no payments exist yet — granting is
+ * manual, from Membros e papéis). Content declares the tier it requires.
+ */
+export const ACCESS_TIERS = ["free", "full"] as const;
+export type AccessTier = (typeof ACCESS_TIERS)[number];
+
 export const users = pgTable("users", {
   id: id(),
   email: text("email").notNull().unique(),
@@ -52,6 +60,7 @@ export const users = pgTable("users", {
   avatarHue: integer("avatar_hue").notNull().default(210),
   avatarFileId: uuid("avatar_file_id").references((): AnyPgColumn => files.id, { onDelete: "set null" }),
   isDemo: boolean("is_demo").notNull().default(false),
+  accessTier: text("access_tier", { enum: ACCESS_TIERS }).notNull().default("free"),
   createdAt: createdAt(),
 });
 
@@ -432,6 +441,8 @@ export const courses = pgTable("courses", {
   level: text("level").notNull().default("Essencial"),
   coverHue: integer("cover_hue").notNull().default(40),
   position: integer("position").notNull().default(0),
+  /** Tier needed to watch this collection's videos. */
+  accessTier: text("access_tier", { enum: ACCESS_TIERS }).notNull().default("free"),
 });
 
 export const modules = pgTable("modules", {
@@ -451,6 +462,8 @@ export const lessons = pgTable("lessons", {
   slug: text("slug").notNull(),
   title: text("title").notNull(),
   content: text("content").notNull(),
+  /** YouTube, Vimeo or a direct https video file. Null for text-only lessons. */
+  videoUrl: text("video_url"),
   durationMin: integer("duration_min").notNull().default(5),
   position: integer("position").notNull().default(0),
 });

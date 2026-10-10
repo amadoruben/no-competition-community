@@ -2,6 +2,7 @@ import { Info, Trophy } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { RankMedal, ScorePill } from "@/components/domain";
+import { MembersSwitch } from "@/components/members-switch";
 import { Avatar, Card, CardHeader, cx, EmptyState, PageHeader, ProjectLogo, Tabs } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import { POINT_RULES } from "@/lib/points";
@@ -27,9 +28,10 @@ export default async function LeaderboardPage(props: PageProps<"/leaderboard">) 
 
   return (
     <div>
-      <PageHeader title="Classificações" description="Participação e mérito medidos em separado, com regras públicas. Popularidade não conta." />
+      <MembersSwitch active="leaderboard" />
+      <PageHeader title="Classificação" description="Participação e mérito medidos em separado, com regras públicas. Popularidade não conta." />
       <Tabs active={view.key} items={tabs} />
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_320px]">
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
         <div className="min-w-0">{view.key === "challenge" ? <ByChallenge user={user} selected={typeof sp.c === "string" ? sp.c : undefined} /> : <Standings view={view.key} hint={view.hint} me={user.id} />}</div>
         <aside>
           <Card>

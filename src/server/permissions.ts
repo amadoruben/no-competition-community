@@ -1,9 +1,12 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { evaluatorAssignments, projectMembers, projects, type User } from "@/db/schema";
+import { evaluatorAssignments, projectMembers, projects, type AccessTier, type User } from "@/db/schema";
 import { forbidden } from "./errors";
 
 export const isInvestor = (u: Pick<User, "role"> | null | undefined) => u?.role === "investor";
+
+/** Exclusive content: "free" is open to every member; "full" needs access granted by the team (or the admin role). */
+export const canAccessTier = (u: Pick<User, "role" | "accessTier">, tier: AccessTier) => tier === "free" || u.accessTier === "full" || isInvestor(u);
 
 export async function isAssignedEvaluator(userId: string, challengeId: string) {
   const rows = await db

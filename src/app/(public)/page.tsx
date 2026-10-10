@@ -1,4 +1,4 @@
-import { ArrowRight, Check, ClipboardCheck, Gauge, Gavel, LineChart, Rocket, ScrollText, Scale } from "lucide-react";
+import { ArrowRight, Gavel, LineChart, MessagesSquare, PlayCircle, ScrollText, Scale, Trophy, Users } from "lucide-react";
 import Link from "next/link";
 import { redirect, unstable_rethrow } from "next/navigation";
 import { Brand } from "@/components/brand";
@@ -10,42 +10,24 @@ import { logger } from "@/server/logger";
 import { currentUser, homeFor } from "@/server/session";
 
 const steps = [
-  { n: "01", title: "O investidor lança um desafio", body: "Problema, regras, critérios com pesos e prémios — tudo público desde o primeiro dia." },
-  { n: "02", title: "Equipas constroem e submetem", body: "Cada membro apresenta o seu projecto, partilha progresso e submete antes do prazo." },
-  { n: "03", title: "Avaliação com critérios explícitos", body: "Avaliadores atribuídos dão nota por critério e feedback. A nota final é uma média ponderada." },
-  { n: "04", title: "Resultados e oportunidades", body: "Vencedores publicados, rankings actualizados. O investimento é uma decisão separada." },
+  { n: "01", title: "A No Competition lança um desafio", body: "Problema, regras, datas, critérios com pesos e prémios — públicos antes de começar." },
+  { n: "02", title: "Os membros inscrevem-se e constroem", body: "Cada participante apresenta o seu projecto, partilha progresso na comunidade e submete antes do prazo." },
+  { n: "03", title: "Avaliação com critérios explícitos", body: "Avaliadores atribuídos dão nota por critério e feedback escrito. As notas ficam privadas até à publicação." },
+  { n: "04", title: "Resultados e prémios", body: "Vencedores publicados e prémios atribuídos conforme as regras do desafio." },
 ];
 
-const audiences = [
-  {
-    icon: Gauge,
-    who: "Para investidores",
-    title: "Encontre equipas antes do mercado.",
-    points: [
-      "Lance desafios com critérios e prémios públicos",
-      "Compare projectos por critério, lado a lado",
-      "Decida com histórico auditável e pipeline de investimento separado",
-    ],
-  },
-  {
-    icon: Rocket,
-    who: "Para membros",
-    title: "Construa com prazo, critério e feedback.",
-    points: ["Descubra desafios e submeta o seu projecto", "Receba notas por critério e feedback escrito", "Ganhe reconhecimento por mérito, não por popularidade"],
-  },
-  {
-    icon: ClipboardCheck,
-    who: "Para avaliadores",
-    title: "Avalie com foco e independência.",
-    points: ["Veja apenas os trabalhos atribuídos", "Pontue cada critério de 0 a 10 com nota ponderada automática", "As suas notas ficam privadas até à publicação"],
-  },
+const inside = [
+  { icon: MessagesSquare, title: "Comunidade", body: "Anúncios oficiais, conversas, perguntas e progresso de quem está a construir." },
+  { icon: PlayCircle, title: "Vídeos exclusivos", body: "Episódios, bastidores e ensinamentos da No Competition, organizados por colecção." },
+  { icon: Trophy, title: "Desafios com prémios", body: "Regras e critérios públicos, avaliação independente e resultados transparentes." },
+  { icon: Users, title: "Membros", body: "Perfis, conquistas e pessoas com os mesmos interesses para formar equipa." },
 ];
 
 const principles = [
   { icon: Scale, title: "Critérios antes da competição", body: "Pesos e regras definidos e visíveis antes de qualquer submissão." },
   { icon: LineChart, title: "Mérito não é popularidade", body: "Reacções não dão pontos. O mérito vem apenas de resultados avaliados." },
-  { icon: Gavel, title: "Vencer não é investimento", body: "Prémio, vitória e financiamento são registos distintos, com processos próprios." },
-  { icon: ScrollText, title: "Decisões com histórico", body: "Publicações, encerramentos e resultados ficam registados e auditáveis." },
+  { icon: Gavel, title: "Sem promessas vazias", body: "Cada prémio tem condições publicadas; participar não garante prémio." },
+  { icon: ScrollText, title: "Decisões com histórico", body: "Publicações, encerramentos e resultados ficam registados." },
 ];
 
 /** The marketing page must render even when the database is unreachable or not yet configured. */
@@ -64,8 +46,8 @@ export default async function Landing() {
   const { user, challenges, stats } = await liveData();
   if (user) redirect(homeFor(user));
   const demo = demoMode();
-  // An empty platform shows how decisions are made instead of a row of zeros.
-  const live = stats && stats.challenges + stats.projects > 0 ? stats : null;
+  // Real numbers only when there is something to show; never a row of zeros.
+  const live = stats && stats.members + stats.challenges > 0 ? stats : null;
 
   return (
     <div className="bg-paper">
@@ -76,101 +58,61 @@ export default async function Landing() {
           <div className="flex h-16 items-center justify-between">
             <Brand invert />
             <div className="flex items-center gap-2">
-              <Link href="/login" className="hidden h-9 items-center rounded-full px-4 text-sm font-medium text-white/80 hover:text-white sm:flex">
+              <Link href="/login" className="flex h-9 items-center rounded-full px-4 text-sm font-medium text-white/80 hover:text-white">
                 Entrar
               </Link>
-              <ButtonLink href="/register" variant="accent" size="sm">
+              <ButtonLink href="/register" variant="accent" size="sm" className="hidden sm:inline-flex">
                 Criar conta
               </ButtonLink>
             </div>
           </div>
-          <div className="grid gap-10 pt-14 pb-20 lg:grid-cols-[1.25fr_1fr] lg:items-end lg:pt-24 lg:pb-28">
+          <div className="grid gap-10 pt-12 pb-16 lg:grid-cols-[1.2fr_1fr] lg:items-center lg:pt-20 lg:pb-24">
             <div>
-              {live && (
-                <p className="mb-5 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[13px] text-white/80">
-                  <span className="size-1.5 rounded-full bg-volt" /> {live.challenges} desafios · {live.projects} projectos na comunidade
-                </p>
-              )}
-              <h1 className="font-display text-[44px] leading-[1.02] font-semibold sm:text-[64px] lg:text-[76px]">
+              <p className="mb-5 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[13px] text-white/80">
+                <span className="size-1.5 rounded-full bg-volt" /> A comunidade oficial da No Competition
+              </p>
+              <h1 className="font-display text-[42px] leading-[1.02] font-semibold sm:text-[60px] lg:text-[72px]">
                 Construa algo que <span className="text-volt">não tem concorrência.</span>
               </h1>
               <p className="mt-6 max-w-xl text-[17px] leading-relaxed text-white/70">
-                A comunidade onde um investidor lança desafios reais e as melhores equipas constroem, submetem e são avaliadas com critérios públicos.
+                Conteúdos exclusivos, conversas com quem está a construir e desafios com prémios — num só lugar, para quem segue a No Competition.
               </p>
               <div className="mt-8 flex flex-wrap gap-3">
-                <ButtonLink href={demo ? "/demo" : "/login"} variant="accent" size="lg">
-                  {demo ? "Explorar a demonstração" : "Entrar"} <ArrowRight className="size-4" />
+                <ButtonLink href="/register" variant="accent" size="lg">
+                  Entrar na comunidade <ArrowRight className="size-4" />
                 </ButtonLink>
-                <ButtonLink href="/register" size="lg" className="bg-white/10 text-white hover:bg-white/20">
-                  Juntar-me à comunidade
+                <ButtonLink href={demo ? "/demo" : "/login"} size="lg" className="bg-white/10 text-white hover:bg-white/20">
+                  {demo ? "Ver a demonstração" : "Já sou membro"}
                 </ButtonLink>
               </div>
+              {live && (
+                <p className="mt-6 text-[13px] text-white/60">
+                  {live.members} {live.members === 1 ? "membro" : "membros"}
+                  {live.challenges > 0 && ` · ${live.challenges} ${live.challenges === 1 ? "desafio" : "desafios"}`}
+                </p>
+              )}
             </div>
-            {live ? (
-              <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl bg-white/10 ring-1 ring-white/10">
-                {[
-                  ["Desafios", live.challenges],
-                  ["Projectos", live.projects],
-                  ["Membros", live.members],
-                  ["Submissões", live.submissions],
-                ].map(([k, v]) => (
-                  <div key={k} className="bg-ink/60 p-5 backdrop-blur">
-                    <dt className="text-[12px] tracking-wide text-white/50 uppercase">{k}</dt>
-                    <dd className="tabular mt-1 font-display text-4xl font-semibold">{v}</dd>
-                  </div>
-                ))}
-              </dl>
-            ) : (
-              <CriteriaExample />
-            )}
+            <ul className="grid gap-3 sm:grid-cols-2">
+              {inside.map(({ icon: Icon, title, body }) => (
+                <li key={title} className="rounded-2xl bg-white/[0.06] p-5 ring-1 ring-white/10 backdrop-blur">
+                  <span className="grid size-9 place-items-center rounded-lg bg-volt text-ink">
+                    <Icon className="size-[18px]" />
+                  </span>
+                  <h2 className="mt-3 font-semibold">{title}</h2>
+                  <p className="mt-1 text-[13px] leading-relaxed text-white/60">{body}</p>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-[1200px] px-4 pt-16 sm:px-6 sm:pt-20">
-        <h2 className="font-display text-3xl font-semibold sm:text-4xl">Uma plataforma, três papéis</h2>
-        <div className="mt-8 grid gap-4 lg:grid-cols-3">
-          {audiences.map(({ icon: Icon, who, title, points }) => (
-            <div key={who} className="flex flex-col rounded-2xl bg-surface p-6 ring-1 ring-line">
-              <div className="flex items-center gap-2 text-[13px] font-semibold text-muted">
-                <span className="grid size-8 place-items-center rounded-lg bg-volt-soft text-ink ring-1 ring-volt-strong/40">
-                  <Icon className="size-4" />
-                </span>
-                {who}
-              </div>
-              <h3 className="mt-4 font-display text-xl font-semibold">{title}</h3>
-              <ul className="mt-4 space-y-2 text-sm text-ink-2">
-                {points.map((p) => (
-                  <li key={p} className="flex gap-2">
-                    <Check className="mt-0.5 size-4 shrink-0 text-ok" />
-                    {p}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-[1200px] px-4 py-16 sm:px-6 sm:py-20">
-        <h2 className="font-display text-3xl font-semibold sm:text-4xl">Como funciona</h2>
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {steps.map((s) => (
-            <div key={s.n} className="rounded-2xl bg-surface p-5 ring-1 ring-line">
-              <div className="font-mono text-[13px] text-muted">{s.n}</div>
-              <h3 className="mt-3 text-[16px] font-semibold">{s.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-ink-2">{s.body}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
       {challenges.length > 0 && (
-        <section className="mx-auto max-w-[1200px] px-4 pb-16 sm:px-6 sm:pb-20">
+        <section className="mx-auto max-w-[1200px] px-4 pt-16 sm:px-6 sm:pt-20">
           <div className="flex items-end justify-between gap-4">
             <h2 className="font-display text-3xl font-semibold sm:text-4xl">Desafios abertos</h2>
-            <Link href="/login" className="text-sm font-medium underline-offset-4 hover:underline">
-              Ver todos
+            <Link href="/register" className="text-sm font-medium underline-offset-4 hover:underline">
+              Participar
             </Link>
           </div>
           <div className="mt-8 grid gap-4 md:grid-cols-3">
@@ -193,6 +135,19 @@ export default async function Landing() {
           </div>
         </section>
       )}
+
+      <section className="mx-auto max-w-[1200px] px-4 py-16 sm:px-6 sm:py-20">
+        <h2 className="font-display text-3xl font-semibold sm:text-4xl">Como funcionam os desafios</h2>
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {steps.map((s) => (
+            <div key={s.n} className="rounded-2xl bg-surface p-5 ring-1 ring-line">
+              <div className="font-mono text-[13px] text-muted">{s.n}</div>
+              <h3 className="mt-3 text-[16px] font-semibold">{s.title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-ink-2">{s.body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <section className="border-y border-line bg-surface">
         <div className="mx-auto grid max-w-[1200px] gap-8 px-4 py-16 sm:px-6 lg:grid-cols-[1fr_2fr]">
@@ -217,20 +172,11 @@ export default async function Landing() {
       </section>
 
       <section className="mx-auto max-w-[1200px] px-4 py-16 text-center sm:px-6">
-        <h2 className="font-display text-3xl font-semibold sm:text-4xl">Veja a plataforma por dentro.</h2>
-        <p className="mx-auto mt-3 max-w-lg text-ink-2">
-          {demo ? "Entre com uma conta de demonstração como investidora, avaliadora ou membro." : "Seis passos, do desafio publicado à decisão de investimento."}
-        </p>
-        <ul className="mx-auto mt-6 flex max-w-xl flex-wrap justify-center gap-x-6 gap-y-2 text-sm text-ink-2">
-          {["Criar e publicar desafios", "Avaliar e comparar projectos", "Publicar resultados"].map((t) => (
-            <li key={t} className="flex items-center gap-1.5">
-              <Check className="size-4 text-ok" /> {t}
-            </li>
-          ))}
-        </ul>
+        <h2 className="font-display text-3xl font-semibold sm:text-4xl">Faça parte da comunidade.</h2>
+        <p className="mx-auto mt-3 max-w-lg text-ink-2">A conta é gratuita. Alguns conteúdos exclusivos são desbloqueados pela equipa No Competition.</p>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
-          <ButtonLink href="/demo" size="lg">
-            Ver a visita guiada <ArrowRight className="size-4" />
+          <ButtonLink href="/register" size="lg" variant="accent">
+            Criar conta <ArrowRight className="size-4" />
           </ButtonLink>
           <ButtonLink href="/login" size="lg" variant="secondary">
             Entrar
@@ -238,47 +184,9 @@ export default async function Landing() {
         </div>
       </section>
       <footer className="border-t border-line py-8 text-center text-[12px] text-muted">
-        © No Competition Community
+        © No Competition
         {demo && " · Os dados apresentados são fictícios, para demonstração."}
       </footer>
     </div>
-  );
-}
-
-/** Illustration (not live data): how a submission is scored against public, weighted criteria. */
-function CriteriaExample() {
-  const rows = [
-    ["Problema e mercado", 30, 8],
-    ["Execução técnica", 30, 7],
-    ["Modelo de negócio", 25, 9],
-    ["Equipa", 15, 7],
-  ] as const;
-  const total = rows.reduce((t, [, w, n]) => t + (w * n) / 100, 0);
-  return (
-    <figure className="rounded-2xl bg-white/[0.06] p-5 ring-1 ring-white/10 backdrop-blur">
-      <figcaption className="flex items-center justify-between text-[12px] tracking-wide text-white/50 uppercase">
-        <span>Exemplo de avaliação</span>
-        <span>peso · nota</span>
-      </figcaption>
-      <ul className="mt-4 space-y-3">
-        {rows.map(([k, w, n]) => (
-          <li key={k}>
-            <div className="flex items-baseline justify-between gap-3 text-sm">
-              <span className="text-white/85">{k}</span>
-              <span className="tabular font-mono text-white/60">
-                {w}% · <span className="text-white">{n}</span>
-              </span>
-            </div>
-            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10">
-              <div className="h-full rounded-full bg-volt" style={{ width: `${n * 10}%` }} />
-            </div>
-          </li>
-        ))}
-      </ul>
-      <div className="mt-5 flex items-end justify-between border-t border-white/10 pt-4">
-        <span className="text-[13px] text-white/60">Nota final ponderada</span>
-        <span className="tabular font-display text-4xl font-semibold text-volt">{total.toFixed(1).replace(".", ",")}</span>
-      </div>
-    </figure>
   );
 }

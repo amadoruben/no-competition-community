@@ -1,6 +1,7 @@
 import { Plus, Rocket, Trophy } from "lucide-react";
 import type { Metadata } from "next";
 import { ProjectCard } from "@/components/domain";
+import { MembersSwitch } from "@/components/members-switch";
 import { ButtonLink, Card, EmptyState, FilterChips, PageHeader, Pagination, SearchBox } from "@/components/ui";
 import { STAGE_LABEL } from "@/lib/labels";
 import { listProjects, PROJECT_SORTS } from "@/server/projects";
@@ -32,6 +33,7 @@ export default async function ProjectsPage(props: PageProps<"/projects">) {
 
   return (
     <div>
+      <MembersSwitch active="projects" />
       <PageHeader
         title="Projectos"
         description="O que a comunidade está a construir — do primeiro protótipo à tracção."

@@ -1,9 +1,11 @@
-import { Globe, MapPin, Pencil, Trophy } from "lucide-react";
+import { Globe, KeyRound, MapPin, Pencil, Settings, Trophy } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { PhaseBadge, ProjectCard, RoleTag } from "@/components/domain";
-import { Avatar, ButtonLink, Card, CardHeader, cx, EmptyState } from "@/components/ui";
+import { PhaseBadge, PostRow, ProjectCard, RoleTag } from "@/components/domain";
+import { Avatar, Badge, ButtonLink, Card, CardHeader, cx, EmptyState } from "@/components/ui";
+import { ACCESS_LABEL, ROLE_LABEL } from "@/lib/labels";
+import { listFeed } from "@/server/community";
 import { challengePhase } from "@/lib/challenge-state";
 import { fmtDate } from "@/lib/format";
 import { DomainError } from "@/server/errors";
@@ -29,7 +31,8 @@ export default async function MemberPage(props: PageProps<"/members/[handle]">) 
     throw e;
   }
   const u = d.user;
-  const pts = u.role === "member" ? await memberPoints(u.id) : null;
+  const [pts, activity] = await Promise.all([u.role === "member" ? memberPoints(u.id) : null, listFeed(viewer, { authorId: u.id, limit: 5 })]);
+  const own = viewer.id === u.id;
   const links = [
     [u.websiteUrl, "Website"],
     [u.linkedinUrl, "LinkedIn"],
@@ -62,7 +65,7 @@ export default async function MemberPage(props: PageProps<"/members/[handle]">) 
             )}
           </div>
           <div className="flex shrink-0 flex-col items-stretch gap-3 sm:items-end">
-            {viewer.id === u.id && <ButtonLink href="/settings" variant="secondary" size="sm"><Pencil className="size-4" /> Editar perfil</ButtonLink>}
+            {own && <ButtonLink href="/settings" variant="secondary" size="sm"><Pencil className="size-4" /> Editar perfil e foto</ButtonLink>}
             {pts?.overall && (
               <div className="grid grid-cols-3 gap-4 rounded-2xl bg-sunken px-4 py-3 text-center">
                 {[["Posição", `${pts.overall.rank}.º`], ["Pontos", pts.overall.total], ["Mérito", pts.overall.merit]].map(([k, v]) => (
@@ -74,18 +77,58 @@ export default async function MemberPage(props: PageProps<"/members/[handle]">) 
         </div>
       </Card>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
-        <section className="min-w-0">
-          <h2 className="mb-3 text-[15px] font-semibold">Projectos</h2>
-          {d.projects.length === 0 ? (
-            <Card><EmptyState title="Sem projectos públicos" /></Card>
-          ) : (
-            <div className="grid gap-4 sm:grid-cols-2">
-              {d.projects.map(({ p, title }) => <ProjectCard key={p.id} p={p} meta={title} />)}
-            </div>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_340px]">
+        <div className="min-w-0 space-y-6">
+          <section>
+            <h2 className="mb-3 text-[15px] font-semibold">Actividade na comunidade</h2>
+            <Card>
+              {activity.items.length === 0 ? (
+                <EmptyState title={own ? "Ainda não publicou" : "Sem publicações"} action={own && <ButtonLink href="/dashboard" variant="secondary" size="sm">Escrever a primeira publicação</ButtonLink>} />
+              ) : (
+                <div className="divide-y divide-line/70">{activity.items.map((f) => <PostRow key={f.post.id} item={f} />)}</div>
+              )}
+            </Card>
+          </section>
+          {(d.projects.length > 0 || own) && (
+            <section>
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-[15px] font-semibold">Projectos</h2>
+                {own && <ButtonLink href="/projects/new" variant="ghost" size="sm">Novo projecto</ButtonLink>}
+              </div>
+              {d.projects.length === 0 ? (
+                <Card><EmptyState title="Sem projectos">Um projecto é o que submete aos desafios.</EmptyState></Card>
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {d.projects.map(({ p, title }) => <ProjectCard key={p.id} p={p} meta={title} />)}
+                </div>
+              )}
+            </section>
           )}
-        </section>
+        </div>
         <aside className="space-y-4">
+          {own && (
+            <Card>
+              <CardHeader title="A sua conta" />
+              <dl className="space-y-3 px-5 pb-5 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-muted">Acesso</dt>
+                  <dd><Badge tone={viewer.accessTier === "full" ? "volt" : "neutral"}><KeyRound className="size-3" /> {ACCESS_LABEL[viewer.accessTier]}</Badge></dd>
+                </div>
+                <p className="text-[12px] text-muted">
+                  {viewer.accessTier === "full" ? "Vê todos os vídeos, incluindo as colecções exclusivas." : "Vê os vídeos abertos a todos os membros. As colecções exclusivas são desbloqueadas pela equipa No Competition."}
+                </p>
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-muted">Papel</dt>
+                  <dd className="font-medium">{ROLE_LABEL[viewer.role]}</dd>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-muted">Email</dt>
+                  <dd className="truncate font-medium">{viewer.email}</dd>
+                </div>
+                <ButtonLink href="/settings" variant="secondary" size="sm" className="w-full"><Settings className="size-4" /> Definições da conta</ButtonLink>
+              </dl>
+            </Card>
+          )}
           <Card>
             <CardHeader title="Conquistas" />
             {d.achievements.length === 0 ? (

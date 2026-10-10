@@ -15,6 +15,7 @@ function postQuery(viewerId: string) {
       authorName: users.name,
       authorHandle: users.handle,
       authorHue: users.avatarHue,
+      authorAvatar: users.avatarFileId,
       authorRole: users.role,
       challengeTitle: challenges.title,
       challengeSlug: challenges.slug,
@@ -52,7 +53,7 @@ export async function getPost(viewer: User, postId: string) {
   const [row] = isUuid(postId) ? await postQuery(viewer.id).where(eq(posts.id, postId)).limit(1) : [];
   if (!row) throw notFound("Publicação não encontrada.");
   const thread = await db
-    .select({ c: comments, authorName: users.name, authorHandle: users.handle, authorHue: users.avatarHue, authorRole: users.role })
+    .select({ c: comments, authorName: users.name, authorHandle: users.handle, authorHue: users.avatarHue, authorAvatar: users.avatarFileId, authorRole: users.role })
     .from(comments)
     .innerJoin(users, eq(users.id, comments.authorId))
     .where(eq(comments.postId, postId))
@@ -70,7 +71,7 @@ const postInput = z.object({
 
 export async function createPost(actor: User, input: unknown) {
   const v = parse(postInput, input);
-  if (v.kind === "announcement" && !isInvestor(actor)) throw forbidden("Apenas o investidor pode publicar anúncios oficiais.");
+  if (v.kind === "announcement" && !isInvestor(actor)) throw forbidden("Apenas a equipa No Competition pode publicar anúncios oficiais.");
   if (v.projectId && !(await isProjectMember(actor.id, v.projectId))) throw forbidden("Só pode associar projectos de que faz parte.");
   const [p] = await db
     .insert(posts)
@@ -100,4 +101,12 @@ export async function setPinned(actor: User, postId: string, pinned: boolean) {
   if (!isInvestor(actor)) throw forbidden();
   if (!isUuid(postId)) throw notFound("Publicação não encontrada.");
   await db.update(posts).set({ pinned }).where(eq(posts.id, postId));
+}
+
+/** The author removes their own post; the admin moderates any post. Comments and reactions go with it. */
+export async function deletePost(actor: User, postId: string) {
+  const [p] = isUuid(postId) ? await db.select({ authorId: posts.authorId }).from(posts).where(eq(posts.id, postId)).limit(1) : [];
+  if (!p) throw notFound("Publicação não encontrada.");
+  if (p.authorId !== actor.id && !isInvestor(actor)) throw forbidden("Só o autor ou a administração podem remover esta publicação.");
+  await db.delete(posts).where(eq(posts.id, postId));
 }

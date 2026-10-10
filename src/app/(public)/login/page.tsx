@@ -37,7 +37,11 @@ export default async function LoginPage(props: PageProps<"/login">) {
           <p className="mt-4 max-w-md text-white/70">As contas de demonstração usam dados fictícios. Pode criar, submeter e publicar à vontade — repõe-se com <code className="rounded bg-white/10 px-1.5 py-0.5 text-[13px]">npm run db:seed</code>.</p>
         </>
         ) : (
-          <h2 className="font-display text-4xl leading-tight font-semibold">Desafios reais. Critérios públicos. Decisões registadas.</h2>
+          <>
+            <p className="text-[13px] font-semibold tracking-wide text-volt uppercase">Comunidade No Competition</p>
+            <h2 className="mt-3 font-display text-4xl leading-tight font-semibold">O que é novo desde a última visita está no Início.</h2>
+            <p className="mt-4 max-w-md text-white/70">Anúncios oficiais, vídeos exclusivos e desafios abertos.</p>
+          </>
         )
       }
     >

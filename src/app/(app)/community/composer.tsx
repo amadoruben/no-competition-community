@@ -25,7 +25,7 @@ export function Composer({
         className="flex w-full items-center gap-3 rounded-[var(--radius-card)] bg-surface p-4 text-left shadow-[var(--shadow-card)] ring-1 ring-line/70 hover:ring-line-strong"
       >
         <Avatar name={name} hue={hue} size={38} />
-        <span className="flex-1 text-[15px] text-muted">Partilhe uma pergunta, ideia ou progresso…</span>
+        <span className="flex-1 text-[15px] text-muted">Escreva algo para a comunidade…</span>
         <span className="rounded-full bg-ink px-4 py-2 text-sm font-medium text-white">Publicar</span>
       </button>
     );

@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 test("guided tour: landing → /demo → step opens the right page as the right role", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("link", { name: "Explorar a demonstração" }).click();
+  await page.getByRole("link", { name: "Ver a demonstração" }).click();
   await expect(page).toHaveURL(/\/demo$/);
   await expect(page.getByText("fictícios")).toBeVisible();
   await expect(page.getByRole("listitem").filter({ has: page.getByRole("heading", { level: 2 }) })).toHaveCount(6);

@@ -8,7 +8,7 @@ const bricolage = Bricolage_Grotesque({ variable: "--font-bricolage", subsets: [
 
 export const metadata: Metadata = {
   title: { default: "No Competition Community", template: "%s · No Competition" },
-  description: "Desafios, projectos e oportunidades de investimento para quem constrói sem concorrência.",
+  description: "A comunidade oficial da No Competition: conteúdos exclusivos, conversas e desafios com prémios.",
 };
 
 export const viewport: Viewport = { themeColor: "#f6f5f0" };

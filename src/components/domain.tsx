@@ -1,4 +1,4 @@
-import { CalendarClock, MessageCircle, Pin, Users } from "lucide-react";
+import { BadgeCheck, CalendarClock, MessageCircle, Pin, Users } from "lucide-react";
 import Link from "next/link";
 import type { ChallengeCard as ChallengeCardData } from "@/server/challenges";
 import type { FeedItem } from "@/server/community";
@@ -9,6 +9,7 @@ import type { Project, ProjectStage, Role } from "@/db/schema";
 import { Avatar, Badge, Card, ChallengeCover, cx, ProjectLogo, type Tone } from "./ui";
 
 export { ChallengeCover };
+import { PostActions } from "./post-actions";
 import { ReactionButton } from "./reaction-button";
 
 export function PhaseBadge({ phase }: { phase: ChallengePhase }) {
@@ -127,17 +128,35 @@ export function PersonLine({
 
 const KIND_TONE: Record<string, Tone> = { announcement: "dark", discussion: "neutral", progress: "ok", question: "info" };
 
+/** The investor is the No Competition team: their posts and profile carry the brand mark. */
 export function RoleTag({ role }: { role: Role }) {
   if (role === "member") return null;
-  return <Badge tone={role === "investor" ? "volt" : "violet"} className="h-5 px-2 text-[11px]">{ROLE_LABEL[role]}</Badge>;
+  if (role === "investor")
+    return (
+      <Badge tone="volt" className="h-5 px-2 text-[11px]">
+        <BadgeCheck className="size-3" /> No Competition
+      </Badge>
+    );
+  return <Badge tone="violet" className="h-5 px-2 text-[11px]">{ROLE_LABEL[role]}</Badge>;
 }
 
-export function PostCard({ item, compact, full }: { item: FeedItem; compact?: boolean; full?: boolean }) {
+export function PostCard({
+  item,
+  compact,
+  full,
+  viewer,
+}: {
+  item: FeedItem;
+  compact?: boolean;
+  full?: boolean;
+  /** Enables moderation controls: authors remove their posts, the admin pins and removes any. */
+  viewer?: { id: string; role: Role };
+}) {
   const p = item.post;
   return (
     <Card className={cx("p-4 sm:p-5", p.kind === "announcement" && "ring-ink/15")}>
       <div className="flex items-start gap-3">
-        <Avatar name={item.authorName} hue={item.authorHue} size={38} />
+        <Avatar name={item.authorName} hue={item.authorHue} fileId={item.authorAvatar} size={38} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px]">
             <Link href={`/members/${item.authorHandle}`} className="font-medium text-ink hover:underline">
@@ -175,6 +194,15 @@ export function PostCard({ item, compact, full }: { item: FeedItem; compact?: bo
             <Link href={`/community/${p.id}`} className="flex h-8 items-center gap-1.5 rounded-full px-2.5 text-[13px] text-muted hover:bg-sunken hover:text-ink">
               <MessageCircle className="size-4" /> {item.commentCount}
             </Link>
+            {viewer && (
+              <PostActions
+                postId={p.id}
+                pinned={p.pinned}
+                canPin={viewer.role === "investor"}
+                canDelete={viewer.role === "investor" || viewer.id === p.authorId}
+                afterDelete={full ? "/dashboard" : undefined}
+              />
+            )}
           </div>
         </div>
       </div>

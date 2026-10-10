@@ -2,13 +2,13 @@ import { UserCog } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { RoleTag } from "@/components/domain";
-import { Avatar, Card, EmptyState, Notice, PageHeader, SearchBox } from "@/components/ui";
+import { Avatar, Badge, Card, EmptyState, Notice, PageHeader, SearchBox } from "@/components/ui";
 import { fmtDay, plural } from "@/lib/format";
 import { listPeople } from "@/server/people";
 import { requireUser } from "@/server/session";
-import { RoleControl } from "./role-control";
+import { AccessControl, RoleControl } from "./role-control";
 
-export const metadata: Metadata = { title: "Membros e papéis" };
+export const metadata: Metadata = { title: "Membros e acessos" };
 
 export default async function PeoplePage(props: PageProps<"/admin/people">) {
   const user = await requireUser(["investor"]);
@@ -18,12 +18,12 @@ export default async function PeoplePage(props: PageProps<"/admin/people">) {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Membros e papéis"
+        title="Membros e acessos"
         description={[plural(counts.member, "membro", "membros"), plural(counts.evaluator, "avaliador(a)", "avaliadores"), plural(counts.investor, "investidor(a)", "investidores")].join(" · ")}
         actions={<SearchBox defaultValue={q} placeholder="Nome ou email" label="Procurar pessoas" />}
       />
       <Notice tone="info">
-        Avaliadores vêem apenas as submissões dos desafios a que os atribuir (no desafio → <span className="font-medium">Avaliadores</span>). As notas ficam privadas até publicar os resultados.
+        <strong>Acesso completo</strong> desbloqueia as colecções de vídeos exclusivas; é atribuído manualmente (ainda não há pagamentos). <strong>Avaliadores</strong> vêem apenas as submissões dos desafios a que os atribuir, e as notas ficam privadas até publicar os resultados.
       </Notice>
       {rows.length === 0 ? (
         <Card>
@@ -40,13 +40,19 @@ export default async function PeoplePage(props: PageProps<"/admin/people">) {
                 <div className="flex flex-wrap items-center gap-2">
                   <Link href={`/members/${p.handle}`} className="truncate font-medium hover:underline">{p.name}</Link>
                   <RoleTag role={p.role} />
+                  {p.accessTier === "full" && p.role !== "investor" && <Badge tone="volt" className="h-5 px-2 text-[11px]">Acesso completo</Badge>}
                   {p.id === user.id && <span className="text-[12px] text-muted">(você)</span>}
                 </div>
                 <div className="truncate text-[13px] text-muted">
                   {p.email} · desde {fmtDay(p.createdAt)}
                 </div>
               </div>
-              {p.role !== "investor" && p.id !== user.id && <RoleControl userId={p.id} role={p.role} />}
+              {p.role !== "investor" && p.id !== user.id && (
+                <div className="flex flex-wrap gap-1.5">
+                  <AccessControl userId={p.id} tier={p.accessTier} />
+                  <RoleControl userId={p.id} role={p.role} />
+                </div>
+              )}
             </div>
           ))}
         </Card>

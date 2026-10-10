@@ -2,6 +2,7 @@ import { MapPin, Users } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { RoleTag } from "@/components/domain";
+import { MembersSwitch } from "@/components/members-switch";
 import { Avatar, Card, EmptyState, PageHeader, Pagination, SearchBox } from "@/components/ui";
 import { listMembers } from "@/server/members";
 import { requireUser } from "@/server/session";
@@ -16,13 +17,14 @@ export default async function MembersPage(props: PageProps<"/members">) {
   const res = await listMembers({ q, page });
   return (
     <div>
+      <MembersSwitch active="members" />
       <PageHeader
         title="Membros"
-        description="Fundadores, engenheiros, designers e avaliadores. Encontre equipa ou quem já resolveu o seu problema."
+        description="Quem faz parte da comunidade No Competition. Encontre pessoas com os mesmos interesses ou equipa para os desafios."
         actions={<SearchBox defaultValue={q} placeholder="Nome, competência, cidade" label="Procurar membros" />}
       />
       {res.rows.length === 0 ? (
-        <Card><EmptyState icon={<Users className="size-5" />} title="Nenhum membro encontrado">Experimente outro termo.</EmptyState></Card>
+        <Card><EmptyState icon={<Users className="size-5" />} title={q ? "Nenhum membro encontrado" : "Ainda não há membros"}>{q ? "Experimente outro termo." : "Os membros aparecem aqui assim que se registarem."}</EmptyState></Card>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {res.rows.map(({ u, projectCount, challengeCount }) => (
@@ -45,7 +47,8 @@ export default async function MembersPage(props: PageProps<"/members">) {
                 </div>
                 <div className="mt-auto flex items-center gap-3 pt-4 text-[12px] text-muted">
                   {u.location && <span className="flex items-center gap-1"><MapPin className="size-3.5" />{u.location}</span>}
-                  {u.role === "member" && <span>{projectCount} projectos · {challengeCount} desafios</span>}
+                  {u.role === "member" && challengeCount > 0 && <span>{challengeCount} {challengeCount === 1 ? "desafio" : "desafios"}</span>}
+                  {u.role === "member" && projectCount > 0 && <span>{projectCount} {projectCount === 1 ? "projecto" : "projectos"}</span>}
                 </div>
               </Card>
             </Link>

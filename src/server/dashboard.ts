@@ -1,6 +1,6 @@
 import { desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { posts, projectUpdates, type User } from "@/db/schema";
+import { lessonProgress, posts, projectUpdates, type User } from "@/db/schema";
 import { challengePhase } from "@/lib/challenge-state";
 import { daysUntil } from "@/lib/format";
 import { listChallenges } from "./challenges";
@@ -17,12 +17,13 @@ export interface Todo {
 }
 
 export async function memberDashboard(user: User) {
-  const [challengeList, projects, points, feed, [posted]] = await Promise.all([
+  const [challengeList, projects, points, feed, [posted], [watched]] = await Promise.all([
     listChallenges(user),
     projectsForUser(user.id),
     memberPoints(user.id),
     listFeed(user, { limit: 4 }),
     db.select({ id: posts.id }).from(posts).where(eq(posts.authorId, user.id)).limit(1),
+    db.select({ id: lessonProgress.lessonId }).from(lessonProgress).where(eq(lessonProgress.userId, user.id)).limit(1),
   ]);
   const challenges = challengeList.map((c) => ({ ...c, phase: challengePhase(c) }));
   const mine = challenges.filter((c) => c.viewerEnrolled);
@@ -69,5 +70,6 @@ export async function memberDashboard(user: User) {
     around,
     feed: feed.items,
     hasPosted: !!posted,
+    hasWatched: !!watched,
   };
 }

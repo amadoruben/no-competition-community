@@ -77,7 +77,7 @@ export default async function ChallengePage(props: PageProps<"/challenges/[slug]
         </dl>
       </ChallengeCover>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_340px]">
         <div className="min-w-0">
           <Tabs active={tab} items={tabs} />
           <div className="mt-6 space-y-6">
@@ -149,7 +149,7 @@ export default async function ChallengePage(props: PageProps<"/challenges/[slug]
                   </Card>
                 ))}
                 <p className="text-[13px] text-muted">
-                  Vencer um desafio dá direito ao prémio indicado. Oportunidades de investimento são processos separados, sujeitos a due diligence.
+                  Os prémios são atribuídos de acordo com as regras deste desafio e com os resultados publicados pela No Competition; nenhuma participação garante um prémio. Oportunidades de investimento são processos separados, sujeitos a análise própria.
                 </p>
               </div>
             )}

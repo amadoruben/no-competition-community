@@ -92,7 +92,7 @@ test("validation errors keep the user's input", async ({ browser }) => {
 test("community: post, comment and react", async ({ browser }) => {
   const mem = await loginAs(browser, MEMBER);
   await mem.goto("/community");
-  await mem.getByRole("button", { name: /Partilhe uma pergunta/ }).click();
+  await mem.getByRole("button", { name: /Escreva algo para a comunidade/ }).click();
   await mem.locator('input[name="title"]').fill("Pergunta de teste E2E");
   await mem.locator('textarea[name="body"]').fill("Alguém tem experiência com tarifas bi-horárias?");
   await mem.getByRole("button", { name: "Publicar" }).click();

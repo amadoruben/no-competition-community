@@ -17,7 +17,7 @@ export function CompleteButton({ lessonId, done }: { lessonId: string; done: boo
         })
       } className={buttonClass(done ? "secondary" : "accent", "md")}>
       {pending ? <LoaderCircle className="size-4 animate-spin" /> : <Check className="size-4" />}
-      {done ? "Concluída · desmarcar" : "Marcar como concluída"}
+      {done ? "Visto · desmarcar" : "Marcar como visto"}
     </button>
   );
 }
