@@ -116,7 +116,7 @@ export async function investorOverview(actor: User) {
     setup: {
       challengeCreated: rows.length > 0,
       challengePublished: rows.some((r) => r.status !== "draft"),
-      hasMembers: people("member") > 0,
+      hasMembers: people("member") + people("evaluator") > 0,
       hasEvaluators: people("evaluator") > 0,
       evaluatorsAssigned: assigned.n > 0,
     },

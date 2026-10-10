@@ -62,6 +62,7 @@ export default async function AdminPage() {
       </dl>
       )}
 
+      {s.challengeCreated && (
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         <Card className="min-w-0">
           <CardHeader title="Ciclo dos desafios" subtitle="Próxima acção para cada desafio" />
@@ -143,6 +144,7 @@ export default async function AdminPage() {
           </Card>
         </aside>
       </div>
+      )}
     </div>
   );
 }

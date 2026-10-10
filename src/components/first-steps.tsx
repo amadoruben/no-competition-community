@@ -20,18 +20,18 @@ export function FirstSteps({ title = "Primeiros passos", steps }: { title?: stri
       </div>
       <ol className="divide-y divide-line/70">
         {steps.map((s, i) => (
-          <li key={s.title} className={cx("flex items-center gap-4 px-5 py-3.5", i === next && "bg-volt/10")}>
+          <li key={s.title} className={cx("flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3.5 sm:flex-nowrap", i === next && "bg-volt/10")}>
             <span className={cx("grid size-8 shrink-0 place-items-center rounded-full text-[13px] font-semibold", s.done ? "bg-ink text-volt" : i === next ? "bg-volt text-ink" : "bg-sunken text-muted")}>
               {s.done ? <Check className="size-4" strokeWidth={3} /> : i + 1}
             </span>
-            <div className="min-w-0 flex-1">
+            <div className="min-w-[calc(100%-3rem)] flex-1 sm:min-w-0">
               <p className={cx("text-sm font-medium", s.done && "text-muted line-through")}>{s.title}</p>
               {!s.done && <p className="text-[13px] text-muted">{s.detail}</p>}
             </div>
             {!s.done && (
               <Link
                 href={s.href}
-                className={cx("inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium", i === next ? "bg-ink text-white hover:bg-ink-2" : "ring-1 ring-line hover:bg-sunken")}
+                className={cx("ml-12 inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-[13px] font-medium sm:ml-0", i === next ? "bg-ink text-white hover:bg-ink-2" : "ring-1 ring-line hover:bg-sunken")}
               >
                 {s.cta} <ArrowRight className="size-3.5" />
               </Link>
