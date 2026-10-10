@@ -20,7 +20,13 @@ export async function register() {
   if (auto === "1") {
     const { dbHandle, openDatabase } = await import("./db");
     const { runMigrations } = await import("./db/migrate");
-    const { migrationDatabaseUrl } = await import("./lib/supabase-env");
+    const { migrationDatabaseUrl, previewTargetsProduction } = await import("./lib/supabase-env");
+    const blocked = previewTargetsProduction(process.env);
+    if (blocked) {
+      const { logger } = await import("./server/logger");
+      logger.error("migrations.blocked", { reason: blocked });
+      return;
+    }
     // Prefer a session connection for DDL (explicit, or derived from a Supabase pooler URL).
     const migUrl = migrationDatabaseUrl(process.env);
     const direct = migUrl && migUrl !== process.env.DATABASE_URL ? migUrl : undefined;

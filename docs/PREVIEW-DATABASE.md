@@ -56,15 +56,24 @@
    Os valores não devem ir para o chat nem para o Git.
 8. **Avisar o agente:** "feito".
 
+## Protecção já activa no código (sem configuração na Vercel)
+
+Um build ou servidor com `VERCEL_ENV=preview` que aponte para o projecto de Production (`nbexcezniqczbxlkephk`) — pelo URL público, pela `DATABASE_URL`, pela `POSTGRES_URL` da integração ou pelo URL de migrações — **falha antes de migrar** e não escreve nada (`previewTargetsProduction` em `src/lib/supabase-env.ts`). `PRODUCTION_SUPABASE_REF` continua a poder sobrepor o valor, mas já não é necessária.
+
+Consequência: enquanto a Preview usar a base partilhada, um push para esta branch produz um deploy de Preview **falhado** (com a mensagem acima) e a base de Production fica intacta. A Preview só volta a ficar disponível depois dos passos manuais acima.
+
 ## Depois (pelo agente)
 
-1. Criar `PRODUCTION_SUPABASE_REF=nbexcezniqczbxlkephk` (Preview, mesma branch). A partir daí, um build de Preview que aponte para o projecto de Production **falha** em vez de escrever nele.
-2. Novo deploy da Preview. O build:
+1. Novo deploy da Preview (push autorizado). O build:
    - verifica que URL, chaves e base são do mesmo projecto e não do de Production;
-   - aplica as 4 migrações (com RLS);
+   - aplica as 6 migrações (0000–0005, com RLS) na base nova e vazia;
    - cria o bucket privado;
    - confirma que a chave pública não lê dados.
    Se algum valor estiver errado, o build falha com a variável em causa identificada, sem mostrar valores.
-3. Testes reais com sessão na nova base: registo, publicação, vídeos exclusivos, desafios e os três papéis.
+2. Testes reais com sessão na nova base: registo, publicação, reacções, stories da equipa, conteúdos sociais, vídeos exclusivos, desafios e os três papéis.
 
 A Preview começa vazia. A conta do dono volta a criar-se pelo registo normal (`OWNER_EMAILS` já está definido para a Preview).
+
+## Production
+
+A migração 0005 (aditiva: tabela `follows`, colunas `lessons.created_at`, `users.social_links`, `reactions.kind`) só chega à base de Production com um merge para `main`, que precisa de autorização explícita.

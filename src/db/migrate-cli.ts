@@ -2,11 +2,17 @@
  * CLI: apply pending migrations (npm run db:migrate). Uses DATABASE_MIGRATION_URL,
  * or derives the Supabase session-pooler URL from DATABASE_URL (see migrationDatabaseUrl).
  */
-import { hasPasswordPlaceholder, migrationDatabaseUrl } from "../lib/supabase-env";
+import { hasPasswordPlaceholder, migrationDatabaseUrl, previewTargetsProduction } from "../lib/supabase-env";
 import { openDatabase } from "./index";
 import { runMigrations } from "./migrate";
 
 async function main() {
+  // Checked first, even with --skip-if-unconfigured: a Preview must fail rather than migrate Production.
+  const blocked = previewTargetsProduction(process.env);
+  if (blocked) {
+    console.error(`Migrations not applied: ${blocked}`);
+    process.exit(1);
+  }
   const url = migrationDatabaseUrl(process.env);
   if (!url) {
     // Lets a deployment without a database (e.g. a first Vercel preview) still

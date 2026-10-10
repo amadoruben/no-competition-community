@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analyseSupabaseEnv, databaseUrlFrom, inspectDbUrl, inspectKey, migrationDatabaseUrl, secretKey, sslFor, supabaseUrl } from "../supabase-env";
+import { analyseSupabaseEnv, databaseUrlFrom, previewTargetsProduction, PRODUCTION_SUPABASE_REF_DEFAULT, inspectDbUrl, inspectKey, migrationDatabaseUrl, secretKey, sslFor, supabaseUrl } from "../supabase-env";
 
 // Fictitious refs and keys: shaped like Supabase's, valid nowhere.
 const A = "aaaaaaaaaaaaaaaaaaaa";
@@ -27,11 +27,25 @@ describe("supabase env analysis", () => {
   });
 
   it("refuses a Preview deployment that points at the Production project", () => {
-    expect(errors({ ...good, VERCEL_ENV: "preview", PRODUCTION_SUPABASE_REF: A }).join()).toContain("uses the Production Supabase project");
+    expect(errors({ ...good, VERCEL_ENV: "preview", PRODUCTION_SUPABASE_REF: A }).join()).toContain("points at the Production Supabase project");
     expect(errors({ ...good, VERCEL_ENV: "preview", PRODUCTION_SUPABASE_REF: B })).toEqual([]);
     // Production itself and unconfigured deployments are not affected.
     expect(errors({ ...good, VERCEL_ENV: "production", PRODUCTION_SUPABASE_REF: A })).toEqual([]);
     expect(errors({ ...good, VERCEL_ENV: "preview" })).toEqual([]);
+  });
+
+  it("blocks a Preview from the Production project even without PRODUCTION_SUPABASE_REF, through any of its URLs", () => {
+    const P = PRODUCTION_SUPABASE_REF_DEFAULT;
+    const prodEverywhere = { ...good, NEXT_PUBLIC_SUPABASE_URL: `https://${P}.supabase.co`, DATABASE_URL: good.DATABASE_URL.replace(A, P), DATABASE_MIGRATION_URL: good.DATABASE_MIGRATION_URL.replace(A, P) };
+    expect(previewTargetsProduction({ ...prodEverywhere, VERCEL_ENV: "preview" })).toContain("Nothing was migrated");
+    // Only the migration URL pointing at Production is enough to refuse.
+    expect(previewTargetsProduction({ ...good, VERCEL_ENV: "preview", DATABASE_MIGRATION_URL: good.DATABASE_MIGRATION_URL.replace(A, P) })).not.toBeNull();
+    // The integration's POSTGRES_URL (no DATABASE_URL) is caught too.
+    expect(previewTargetsProduction({ VERCEL_ENV: "preview", POSTGRES_URL: good.DATABASE_URL.replace(A, P) })).not.toBeNull();
+    // Production, local runs and a Preview with its own project are never blocked.
+    expect(previewTargetsProduction({ ...prodEverywhere, VERCEL_ENV: "production" })).toBeNull();
+    expect(previewTargetsProduction(prodEverywhere)).toBeNull();
+    expect(previewTargetsProduction({ ...good, VERCEL_ENV: "preview" })).toBeNull();
   });
 
   it("catches a database URL from another project", () => {

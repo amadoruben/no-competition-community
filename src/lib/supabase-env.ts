@@ -164,6 +164,27 @@ export function inspectKey(key: string | undefined): KeyInfo | null {
   return { kind: "unknown", ref: null };
 }
 
+/**
+ * The Production Supabase project. Not a secret (it is in every public URL of
+ * the app); kept here so a Preview can never write into Production even when
+ * nobody set PRODUCTION_SUPABASE_REF on the hosting platform.
+ */
+export const PRODUCTION_SUPABASE_REF_DEFAULT = "nbexcezniqczbxlkephk";
+
+/**
+ * Why a Preview deployment must not touch this database (migrations, seeding,
+ * buckets), or null when it may. Production, local and test runs are never
+ * blocked here: only VERCEL_ENV=preview pointing at the Production project,
+ * through its public URL or through the database URL used for migrations.
+ */
+export function previewTargetsProduction(env: Env): string | null {
+  if (env.VERCEL_ENV !== "preview") return null;
+  const prodRef = clean(env.PRODUCTION_SUPABASE_REF) ?? PRODUCTION_SUPABASE_REF_DEFAULT;
+  const refs = [projectRefFromUrl(supabaseUrl(env)), inspectDbUrl(databaseUrlFrom(env))?.ref, inspectDbUrl(migrationDatabaseUrl(env))?.ref];
+  if (!refs.includes(prodRef)) return null;
+  return `This Preview deployment points at the Production Supabase project (${prodRef}). Nothing was migrated. Give Preview its own project: docs/PREVIEW-DATABASE.md.`;
+}
+
 export function analyseSupabaseEnv(env: Env): { ref: string | null; findings: Finding[] } {
   const f: Finding[] = [];
   const add = (level: Finding["level"], message: string) => f.push({ level, message });
@@ -177,10 +198,11 @@ export function analyseSupabaseEnv(env: Env): { ref: string | null; findings: Fi
   // Preview and Production must not share a database. PRODUCTION_SUPABASE_REF names
   // the Production project; a Preview build pointing at it fails instead of writing
   // test data into real data.
-  const prodRef = clean(env.PRODUCTION_SUPABASE_REF);
-  if (prodRef && ref && env.VERCEL_ENV === "preview") {
-    if (ref === prodRef) add("error", `This Preview deployment uses the Production Supabase project (${ref}). Give Preview its own project: docs/PREVIEW-DATABASE.md.`);
-    else add("ok", `Preview uses its own Supabase project (${ref}), not Production (${prodRef})`);
+  const prodRef = clean(env.PRODUCTION_SUPABASE_REF) ?? PRODUCTION_SUPABASE_REF_DEFAULT;
+  if (env.VERCEL_ENV === "preview") {
+    const blocked = previewTargetsProduction(env);
+    if (blocked) add("error", blocked);
+    else if (ref) add("ok", `Preview uses its own Supabase project (${ref}), not Production (${prodRef})`);
   }
 
   for (const name of ["AUTH_PROVIDER", "STORAGE_PROVIDER"] as const) {
