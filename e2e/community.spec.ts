@@ -53,7 +53,7 @@ test("Início: members post, the admin moderates, the profile shows the activity
   await expect(mem.getByRole("link", { name: title })).toBeVisible();
 
   await mem.getByRole("navigation", { name: "Principal" }).getByRole("link", { name: "Perfil" }).click();
-  await expect(mem.getByText("A sua conta")).toBeVisible();
+  await expect(mem.getByRole("link", { name: "Editar perfil" })).toBeVisible();
   await expect(mem.getByRole("link", { name: title })).toBeVisible();
 
   const inv = await loginAs(browser, INVESTOR);
